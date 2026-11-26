@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Only First</title>
+<meta name="description" content="Who scored first in every NBA, NHL and NFL game, and how.">
+<meta name="theme-color" content="#0f1115">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>1️⃣</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-row">
+    <a class="brand" href="#latest" aria-label="Only First home">
+      <span class="brand-mark">1</span>
+      <span class="brand-name">Only First</span>
+    </a>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#latest" data-view="latest">Latest</a>
+      <a href="#teams" data-view="teams">My teams</a>
+      <a href="#stats" data-view="stats">Stats</a>
+    </nav>
+  </div>
+  <div class="wrap filter-row">
+    <div class="chips" role="radiogroup" aria-label="League">
+      <button data-league="all" role="radio">All</button>
+      <button data-league="nba" role="radio">🏀 NBA</button>
+      <button data-league="nhl" role="radio">🏒 NHL</button>
+      <button data-league="nfl" role="radio">🏈 NFL</button>
+    </div>
+    <label class="toggle" id="mine-toggle">
+      <input type="checkbox" id="mine-only"> <span>My teams only</span>
+    </label>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="view-latest" class="view" hidden></section>
+  <section id="view-teams" class="view" hidden></section>
+  <section id="view-stats" class="view" hidden></section>
+  <p id="status" class="status" role="status"></p>
+</main>
+
+<footer class="wrap foot">
+  <p>NBA: first points · NHL: first goal · NFL: first touchdown. Data from ESPN's public feeds, checked every few minutes.
+  <span id="updated"></span></p>
+</footer>
+<div id="tip" class="tip" role="tooltip" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

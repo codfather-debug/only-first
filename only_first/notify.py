@@ -1,50 +1,78 @@
-"""Notification channels. Configure with environment variables:
+"""Notification channels.
 
-ONLY_FIRST_NTFY_TOPIC   push to phones via https://ntfy.sh (free app, no account)
-ONLY_FIRST_WEBHOOK_URL  POST to a Discord or Slack incoming webhook
+Push (free, via https://ntfy.sh): every first score is published to two topics,
+    {prefix}-{league}           e.g. onlyfirst-nba        (every game)
+    {prefix}-{league}-{team}    e.g. onlyfirst-nba-bos    (one team's games)
+for BOTH teams in the game, so fans of either side get it. People subscribe in
+the ntfy app to only the topics they want: no accounts, no server of our own.
+
+The topic prefix comes from docs/config.json ("ntfy_prefix"); the website uses
+the same file to build its subscribe links. Env vars:
+  ONLY_FIRST_NTFY_PREFIX  override the prefix ("" turns push off)
+  ONLY_FIRST_NTFY_SERVER  default https://ntfy.sh
+  ONLY_FIRST_WEBHOOK_URL  optional Discord/Slack incoming webhook (all games)
 """
 from __future__ import annotations
 
 import json
 import os
+import time
+import urllib.error
 import urllib.request
 
 from .extract import FirstScore
 
 EMOJI = {"nba": "🏀", "nhl": "🏒", "nfl": "🏈"}
+NTFY_TAGS = {"nba": "basketball", "nhl": "ice_hockey", "nfl": "football"}
+
+
+def topics(prefix: str, league: str, teams: list[str]) -> list[str]:
+    return [f"{prefix}-{league}"] + [f"{prefix}-{league}-{t.lower()}" for t in teams]
 
 
 def console(fs: FirstScore) -> None:
-    print(f"\n{EMOJI.get(fs.league, '')} ONLY FIRST  {fs.headline()}\n   {fs.message().replace(chr(10), chr(10) + '   ')}", flush=True)
+    body = fs.message().replace("\n", "\n   ")
+    print(f"\n{EMOJI.get(fs.league, '')} ONLY FIRST  {fs.headline()}\n   {body}", flush=True)
 
 
-def ntfy(fs: FirstScore, topic: str, server: str = "https://ntfy.sh") -> None:
-    req = urllib.request.Request(
-        f"{server.rstrip('/')}/{topic}",
-        data=fs.message().encode(),
-        headers={"Title": f"Only First: {fs.headline()}".encode("utf-8").decode("latin-1"),
-                 "Tags": {"nba": "basketball", "nhl": "ice_hockey", "nfl": "football"}[fs.league]},
-        method="POST",
-    )
-    urllib.request.urlopen(req, timeout=15).close()
+def _ntfy(server: str, topic: str, fs: FirstScore, click: str | None) -> None:
+    payload = {"topic": topic, "title": f"Only First: {fs.headline()}",
+               "message": fs.message(), "tags": [NTFY_TAGS[fs.league]]}
+    if click:
+        payload["click"] = click
+    req = urllib.request.Request(server.rstrip("/"), data=json.dumps(payload).encode(),
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    for attempt in range(3):
+        try:
+            urllib.request.urlopen(req, timeout=15).close()
+            return
+        except urllib.error.HTTPError as e:
+            if e.code != 429 or attempt == 2:
+                raise
+            wait = min(int(e.headers.get("Retry-After") or 10), 30)
+            time.sleep(wait)
 
 
-def webhook(fs: FirstScore, url: str) -> None:
+def _webhook(url: str, fs: FirstScore) -> None:
     text = f"{EMOJI.get(fs.league, '')} **Only First:** {fs.headline()}\n{fs.message()}"
-    body = json.dumps({"content": text, "text": text}).encode()  # Discord + Slack
-    req = urllib.request.Request(url, data=body, method="POST",
+    req = urllib.request.Request(url, data=json.dumps({"content": text, "text": text}).encode(),
                                  headers={"Content-Type": "application/json",
-                                          "User-Agent": "only-first/0.1"})
+                                          "User-Agent": "only-first/0.2"}, method="POST")
     urllib.request.urlopen(req, timeout=15).close()
 
 
-def send(fs: FirstScore) -> None:
+def send(fs: FirstScore, teams: list[str], prefix: str | None, site_url: str | None = None) -> None:
     console(fs)
-    topic = os.environ.get("ONLY_FIRST_NTFY_TOPIC")
+    server = os.environ.get("ONLY_FIRST_NTFY_SERVER", "https://ntfy.sh")
     hook = os.environ.get("ONLY_FIRST_WEBHOOK_URL")
-    for name, fn in (("ntfy", lambda: topic and ntfy(fs, topic, os.environ.get("ONLY_FIRST_NTFY_SERVER", "https://ntfy.sh"))),
-                     ("webhook", lambda: hook and webhook(fs, hook))):
+    jobs = []
+    if prefix:
+        jobs += [(f"ntfy:{t}", lambda t=t: _ntfy(server, t, fs, site_url))
+                 for t in topics(prefix, fs.league, teams)]
+    if hook:
+        jobs.append(("webhook", lambda: _webhook(hook, fs)))
+    for name, fn in jobs:
         try:
             fn()
-        except Exception as e:  # never let one channel kill the watcher
-            print(f"   [warn] {name} notification failed: {e}", flush=True)
+        except Exception as e:  # never let one channel kill the run
+            print(f"   [warn] {name} failed: {e}", flush=True)

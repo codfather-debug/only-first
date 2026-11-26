@@ -1,2 +1,3 @@
 __pycache__/
-only_first_state.json
+# Score data lives on the `data` branch; this is just the local copy.
+docs/data/
