@@ -1,14 +1,23 @@
 """Find the "first" scoring event in an ESPN game summary.
 
-NBA -> first points scored
-NHL -> first goal (shootout goals ignored)
-NFL -> first touchdown (offense, defense or special teams)
+NBA -> first points scored   (+ who won the opening tip)
+NHL -> first goal            (shootout goals ignored)
+NFL -> first touchdown       (offense, defense or special teams)
+
+Besides who/how, each FirstScore carries what the website needs to draw it:
+  scorer_id  ESPN athlete id (headshot: a.espncdn.com/i/headshots/<league>/players/full/<id>.png)
+  spot       where it happened, normalized per league:
+               NBA {"x","y"} feet; hoop at (25, 0), y = feet out from the hoop; or {"ft": true}
+               NHL {"x","y"} feet; attacking net at x = 89, y across the ice (-42.5..42.5)
+               NFL {"yards", "lane"} yards to the end zone at the snap; lane left|middle|right
 """
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import Optional
+
+SCHEMA = 2  # bump when FirstScore gains fields, so stored games get re-read
 
 
 @dataclass
@@ -23,6 +32,9 @@ class FirstScore:
     clock: str            # game clock when it happened
     description: str      # full play text from the feed
     assists: list[str]
+    scorer_id: str = ""
+    spot: Optional[dict] = None
+    v: int = SCHEMA
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -91,7 +103,21 @@ def _team_abbr(play: dict, teams: dict[str, str]) -> str:
     return t.get("abbreviation") or teams.get(str(t.get("id")), "?")
 
 
+def _coord(play: dict) -> Optional[tuple[float, float]]:
+    """ESPN uses huge negative sentinels for 'no location'."""
+    c = play.get("coordinate") or {}
+    x, y = c.get("x"), c.get("y")
+    if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
+        return None
+    if abs(x) > 1000 or abs(y) > 1000:
+        return None
+    return float(x), float(y)
+
+
 # ---------------------------------------------------------------- NBA
+
+NBA_HOOP_Y = 1.0  # ESPN's NBA y is measured from just behind the hoop
+
 
 def _nba_how(play: dict) -> str:
     kind = (play.get("type") or {}).get("text", "Basket")
@@ -108,6 +134,16 @@ def _nba_how(play: dict) -> str:
     return label
 
 
+def tipoff_nba(summary: dict) -> Optional[dict]:
+    """Who won the opening jump ball: {"team": "HOU", "text": "..."}."""
+    teams = _teams(summary)
+    for p in _ordered(summary.get("plays") or [])[:6]:
+        kind = (p.get("type") or {}).get("text", "").lower().replace(" ", "")
+        if "jumpball" in kind:
+            return {"team": _team_abbr(p, teams), "text": p.get("text", "")}
+    return None
+
+
 def first_nba(summary: dict) -> Optional[FirstScore]:
     teams, people = _teams(summary), _athletes(summary)
     for p in _ordered(summary.get("plays") or []):
@@ -117,12 +153,21 @@ def first_nba(summary: dict) -> Optional[FirstScore]:
         scorer_id = str(parts[0]["athlete"]["id"]) if parts else ""
         scorer = people.get(scorer_id) or re.split(r" makes ", p.get("text", ""))[0]
         assists = [people.get(str(x["athlete"]["id"]), "") for x in parts[1:]]
+        how = _nba_how(p)
+        xy = _coord(p)
+        if how == "Free throw":
+            spot = {"ft": True}
+        elif xy:
+            spot = {"x": xy[0], "y": round(xy[1] - NBA_HOOP_Y, 1)}
+        else:
+            spot = None
         return FirstScore(
             league="nba", game_id=_game_id(summary), matchup=_matchup(summary),
-            team=_team_abbr(p, teams), scorer=scorer, how=_nba_how(p),
+            team=_team_abbr(p, teams), scorer=scorer, how=how,
             period=(p.get("period") or {}).get("displayValue", ""),
             clock=(p.get("clock") or {}).get("displayValue", ""),
             description=p.get("text", ""), assists=[a for a in assists if a],
+            scorer_id=scorer_id, spot=spot,
         )
     return None
 
@@ -147,8 +192,9 @@ def first_nhl(summary: dict) -> Optional[FirstScore]:
         if not p.get("scoringPlay") or _is_shootout(p):
             continue
         parts = p.get("participants") or []
-        scorer = next((x["athlete"].get("displayName") for x in parts
-                       if x.get("type") == "scorer"), None)
+        scorer_p = next((x for x in parts if x.get("type") == "scorer"), None)
+        scorer = scorer_p["athlete"].get("displayName") if scorer_p else None
+        scorer_id = str(scorer_p["athlete"].get("id", "")) if scorer_p else ""
         text = p.get("text", "")
         if not scorer:
             scorer = text.split(" Goal")[0]
@@ -159,12 +205,19 @@ def first_nhl(summary: dict) -> Optional[FirstScore]:
         how = shot if not strength else f"{shot}, {strength.lower()}"
         if "empty net" in text.lower():
             how += ", empty net"
+        xy = _coord(p)
+        spot = None
+        if xy:
+            x, y = xy
+            if x < 0:  # always draw attacking the same net
+                x, y = -x, -y
+            spot = {"x": x, "y": y}
         return FirstScore(
             league="nhl", game_id=_game_id(summary), matchup=_matchup(summary),
             team=_team_abbr(p, teams), scorer=scorer, how=how,
             period=(p.get("period") or {}).get("displayValue", ""),
             clock=(p.get("clock") or {}).get("displayValue", ""),
-            description=text, assists=assists,
+            description=text, assists=assists, scorer_id=scorer_id, spot=spot,
         )
     return None
 
@@ -179,8 +232,28 @@ def _nfl_scorer(text: str) -> str:
     return m.group(1).strip() if m else text
 
 
+def _nfl_lane(text: str) -> Optional[str]:
+    t = text.lower()
+    if "middle" in t:
+        return "middle"
+    if re.search(r"\bleft\b", t):
+        return "left"
+    if re.search(r"\bright\b", t):
+        return "right"
+    return None
+
+
+def _nfl_play(summary: dict, play_id: str) -> dict:
+    for d in (summary.get("drives") or {}).get("previous", []) or []:
+        for p in d.get("plays", []) or []:
+            if str(p.get("id")) == play_id:
+                return p
+    return {}
+
+
 def first_nfl(summary: dict) -> Optional[FirstScore]:
     teams = _teams(summary)
+    names = {v: k for k, v in _athletes(summary).items()}  # name -> id
     plays = summary.get("scoringPlays") or []
     for p in plays:
         stype = (p.get("scoringType") or {}).get("abbreviation", "")
@@ -189,20 +262,28 @@ def first_nfl(summary: dict) -> Optional[FirstScore]:
         text = p.get("text", "")
         how = (p.get("type") or {}).get("text", "Touchdown")
         yards = re.search(r"(\d+)\s+Yd", text)
-        if yards:
-            n = int(yards.group(1))
+        n = int(yards.group(1)) if yards else None
+        if n is not None:
             how += f", {n} yd" + ("" if n == 1 else "s")
         passer = re.search(r"pass from (.+?)(?:\s*\(|$)", text)
         if passer:
             how += f" from {passer.group(1).strip()}"
+        detail = _nfl_play(summary, str(p.get("id")))
+        lane = _nfl_lane(detail.get("text", ""))
+        to_go = (detail.get("start") or {}).get("yardsToEndzone")
+        spot = None
+        if isinstance(to_go, (int, float)) and 0 <= to_go <= 100 and "return" not in how.lower():
+            spot = {"yards": int(to_go), "lane": lane}
+        elif n is not None:
+            spot = {"yards": min(n, 100), "lane": lane}
+        scorer = _nfl_scorer(text)
         num = (p.get("period") or {}).get("number")
         return FirstScore(
             league="nfl", game_id=_game_id(summary), matchup=_matchup(summary),
-            team=_team_abbr(p, teams), scorer=_nfl_scorer(text), how=how,
+            team=_team_abbr(p, teams), scorer=scorer, how=how,
             period=_PERIODS.get(num, "OT" if num else ""),
             clock=(p.get("clock") or {}).get("displayValue", ""),
-            description=text,
-            assists=[],
+            description=text, assists=[], scorer_id=names.get(scorer, ""), spot=spot,
         )
     return None
 

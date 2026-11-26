@@ -8,8 +8,13 @@ Who scored first in every game, and how.
 | 🏒 NHL | First goal (shot type, power play / even strength, assists; shootouts ignored) |
 | 🏈 NFL | First touchdown (rush / pass / return, yards, passer) |
 
-- **Website** (GitHub Pages): the latest first scores, a team picker, and season stats
-  (who scores first most, how it happens, how often the team that scores first wins).
+- **Website** (GitHub Pages): a card for every game's first score, with the
+  player's photo in team colors and a small court, rink or field showing where it
+  happened. Plus a team picker and season stats: shot maps, who scores first most,
+  how it happens, how often the team that scores first wins, and (NBA) whether
+  winning the opening tip matters.
+- **Installable**: add the site to your phone's home screen and it opens full
+  screen like an app (works offline for everything except new scores).
 - **Phone alerts** (ntfy): one push per game, for every game or just your teams.
 
 Everything runs free: GitHub Actions does the checking, GitHub Pages hosts the
@@ -70,6 +75,13 @@ The website's **My teams** page lists the topics for the teams you pick.
 - **Data source:** ESPN's public JSON is unofficial and unlicensed. Fine for a
   personal or hobby project; a commercial app should switch to a licensed feed
   (only `only_first/espn.py` would change).
+
+## Data upgrades
+
+Each stored game records which version of the extractor read it. When the
+extractor learns something new (like shot locations), the tracker re-reads older
+games 150 at a time on each run, so the whole season upgrades itself within a
+few runs. No manual step.
 
 ## Running it yourself
 
