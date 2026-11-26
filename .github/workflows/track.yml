@@ -3,6 +3,7 @@ name: Track first scores
 # Every 5 minutes GitHub starts this job. While games are live it keeps checking
 # every 30 seconds for ~9 minutes, so coverage is continuous even when GitHub
 # runs the schedule late. Only one run at a time (see concurrency).
+# Re-saved Nov 26, 2026 so GitHub registers the schedule.
 on:
   schedule:
     - cron: "*/5 * * * *"
