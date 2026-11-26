@@ -78,5 +78,6 @@ def teams(league: str) -> list[dict]:
         abbr = TEAM_ALIASES.get(league, {}).get(t["abbreviation"], t["abbreviation"])
         out.append({"abbr": abbr, "name": t["displayName"],
                     "short": t.get("shortDisplayName", t["displayName"]),
-                    "color": t.get("color", "888888"), "logo": logo})
+                    "color": t.get("color", "888888"), "alt": t.get("alternateColor", "cccccc"),
+                    "logo": logo})
     return sorted(out, key=lambda x: x["name"])

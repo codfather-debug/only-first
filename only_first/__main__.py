@@ -18,7 +18,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from . import espn, notify
-from .extract import EXTRACTORS
+from .extract import EXTRACTORS, SCHEMA, tipoff_nba
 
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
@@ -42,8 +42,20 @@ def ntfy_prefix() -> str | None:
     return config().get("ntfy_prefix") or None
 
 
+ENRICH_PER_PASS = 150  # older stored games re-read per pass to pick up new fields
+
+
 def find_first(league: str, game_id: str):
     return EXTRACTORS[league](espn.summary(league, game_id))
+
+
+def read_game(league: str, game_id: str) -> tuple:
+    """(FirstScore or None, extras dict) from one summary fetch."""
+    summary = espn.summary(league, game_id)
+    extras = {}
+    if league == "nba":
+        extras["tip"] = tipoff_nba(summary)
+    return EXTRACTORS[league](summary), extras
 
 
 # ------------------------------------------------------------------ store
@@ -81,10 +93,11 @@ def process_date(store: dict, league: str, day: str, alert: bool) -> int:
         if rec["first"] or g["state"] == "pre":
             continue  # first scores never change once found
         try:
-            fs = find_first(league, g["id"])
+            fs, extras = read_game(league, g["id"])
         except Exception as e:
             print(f"[warn] {key}: {e}", flush=True)
             continue
+        rec.update(extras)
         if fs:
             rec["first"] = fs.to_dict()
             new += 1
@@ -93,6 +106,30 @@ def process_date(store: dict, league: str, day: str, alert: bool) -> int:
             else:
                 notify.console(fs)
     return new
+
+
+def enrich(store: dict, limit: int) -> int:
+    """Re-read games stored by an older version so they gain new fields
+    (headshot id, shot spot, NBA tip-off). Newest games first."""
+    todo = [k for k, g in store["games"].items()
+            if g.get("first") and g["first"].get("v", 1) < SCHEMA]
+    done = 0
+    for key in todo[:limit]:
+        g = store["games"][key]
+        try:
+            fs, extras = read_game(g["league"], g["id"])
+        except Exception as e:
+            print(f"[warn] enrich {key}: {e}", flush=True)
+            continue
+        g.update(extras)
+        if fs:
+            g["first"] = fs.to_dict()
+        else:
+            g["first"]["v"] = SCHEMA  # don't retry forever
+        done += 1
+    if done:
+        print(f"enriched {done} older games ({len(todo) - done} left)", flush=True)
+    return done
 
 
 def et_days_back(n: int) -> list[str]:
@@ -127,6 +164,7 @@ def update_once(leagues: list[str]) -> dict:
                 process_date(store, lg, day, alert=True)
             except Exception as e:
                 print(f"[warn] {lg} {day}: {e}", flush=True)
+    enrich(store, ENRICH_PER_PASS)
     save_store(store)
     return store
 
@@ -160,6 +198,9 @@ def cmd_backfill(args) -> None:
                 print(f"[warn] {lg} {day}: {e}", flush=True)
         save_store(store)
         d += timedelta(days=1)
+    while enrich(store, 100):
+        save_store(store)
+    save_store(store)
 
 
 def cmd_teams(args) -> None:

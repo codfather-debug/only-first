@@ -2,39 +2,50 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Only First</title>
 <meta name="description" content="Who scored first in every NBA, NHL and NFL game, and how.">
-<meta name="theme-color" content="#0f1115">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>1️⃣</text></svg>">
+<meta name="theme-color" content="#12151c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Only First">
+<meta property="og:title" content="Only First">
+<meta property="og:description" content="Who scored first in every NBA, NHL and NFL game, and how.">
+<meta property="og:image" content="https://codfather-debug.github.io/only-first/icons/og.png">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header class="top">
   <div class="wrap top-row">
     <a class="brand" href="#latest" aria-label="Only First home">
-      <span class="brand-mark">1</span>
+      <span id="brand-mark"></span>
       <span class="brand-name">Only First</span>
     </a>
     <nav class="tabs" aria-label="Sections">
-      <a href="#latest" data-view="latest">Latest</a>
-      <a href="#teams" data-view="teams">My teams</a>
-      <a href="#stats" data-view="stats">Stats</a>
+      <a href="#latest" data-view="latest" data-i18n="tab.latest">Latest</a>
+      <a href="#teams" data-view="teams" data-i18n="tab.teams">My teams</a>
+      <a href="#stats" data-view="stats" data-i18n="tab.stats">Stats</a>
     </nav>
   </div>
   <div class="wrap filter-row">
-    <div class="chips" role="radiogroup" aria-label="League">
-      <button data-league="all" role="radio">All</button>
-      <button data-league="nba" role="radio">🏀 NBA</button>
-      <button data-league="nhl" role="radio">🏒 NHL</button>
-      <button data-league="nfl" role="radio">🏈 NFL</button>
+    <div class="chips" role="group" aria-label="Filter games">
+      <button data-league="all" aria-pressed="true" data-i18n="filter.all">All</button>
+      <button data-league="nba" aria-pressed="false"><span class="emo" aria-hidden="true">🏀 </span><span class="lname">NBA</span></button>
+      <button data-league="nhl" aria-pressed="false"><span class="emo" aria-hidden="true">🏒 </span><span class="lname">NHL</span></button>
+      <button data-league="nfl" aria-pressed="false"><span class="emo" aria-hidden="true">🏈 </span><span class="lname">NFL</span></button>
+      <button id="mine-only" class="mine-chip" aria-pressed="false" data-i18n="filter.mine">★ My teams</button>
     </div>
-    <label class="toggle" id="mine-toggle">
-      <input type="checkbox" id="mine-only"> <span>My teams only</span>
-    </label>
+    <button class="install" id="install" data-i18n="install">Install app</button>
+    <button class="gear" id="settings-btn" aria-haspopup="dialog" data-i18n-label="settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="6" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="18" cy="18" r="2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+    </button>
   </div>
 </header>
 
@@ -46,10 +57,17 @@
 </main>
 
 <footer class="wrap foot">
-  <p>NBA: first points · NHL: first goal · NFL: first touchdown. Data from ESPN's public feeds, checked every few minutes.
+  <p><span data-i18n="foot.what">NBA tracks the first points, NHL the first goal, NFL the first touchdown. Data comes from ESPN's public feeds and is checked every few minutes.</span>
   <span id="updated"></span></p>
 </footer>
-<div id="tip" class="tip" role="tooltip" hidden></div>
+<div id="tip" class="tip-box" role="tooltip" hidden></div>
+<div id="toast" class="toast" role="status" hidden></div>
+<dialog id="settings" class="sheet" aria-labelledby="settings-title"><div id="settings-body"></div></dialog>
+<script src="i18n.js"></script>
+<script src="brand.js"></script>
+<script>document.getElementById("brand-mark").outerHTML = window.OFBrand.mark(34);</script>
+<script src="maps.js"></script>
+<script src="share.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
