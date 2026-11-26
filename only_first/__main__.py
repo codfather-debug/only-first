@@ -29,6 +29,7 @@ DATA = Path(os.environ.get("ONLY_FIRST_DATA_DIR") or DOCS / "data")
 FIRSTS = DATA / "firsts.json"
 ET = ZoneInfo("America/New_York")
 POLL_SECONDS = 30
+IDLE_SECONDS = 120  # with --stay, how often to look when no game is live or about to start
 
 
 def config() -> dict:
@@ -173,9 +174,13 @@ def cmd_update(args) -> None:
     deadline = time.monotonic() + args.for_minutes * 60
     while True:
         store = update_once(args.leagues)
-        if time.monotonic() + POLL_SECONDS > deadline or not worth_polling(store):
+        live = worth_polling(store)
+        if not live and not args.stay:
             return
-        time.sleep(POLL_SECONDS)
+        wait = POLL_SECONDS if live else IDLE_SECONDS
+        if time.monotonic() + wait > deadline:
+            return
+        time.sleep(wait)
 
 
 def cmd_watch(args) -> None:
@@ -239,6 +244,8 @@ def main(argv=None) -> None:
         if name == "update":
             p.add_argument("--for-minutes", type=float, default=0,
                            help="keep polling every 30s for this long while games are live")
+            p.add_argument("--stay", action="store_true",
+                           help="use all of --for-minutes even with no game live, looking every 2 min")
         if name == "backfill":
             p.add_argument("--since", required=True, help="YYYYMMDD")
     args = ap.parse_args(argv)

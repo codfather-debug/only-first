@@ -52,12 +52,12 @@ cd docs && python -m http.server 8000           # open http://localhost:8000
 | `docs/maps.js`, `docs/share.js`, `docs/brand.js` | Court/rink/field drawings, share images, logo |
 | `docs/config.json` | Site address, data address, alert topic prefix |
 | `docs/sw.js` | Offline support for the installable app. Bump `SHELL` (e.g. `of-shell-v6`) whenever you change site files, or installed copies keep the old version. |
-| `.github/workflows/track.yml` | The tracker run, every 5 minutes |
+| `.github/workflows/track.yml` | The tracker: each ~9-minute run starts the next |
 | `tests/` | Tests, using real saved games as test data |
 
 ## How the pieces connect
 
-1. GitHub Actions runs `python -m only_first update --for-minutes 9` every 5 minutes. While games are live, it re-checks every 30 seconds.
+1. GitHub Actions runs `python -m only_first update --for-minutes 9 --stay`, checking every 30 seconds while a game is live and every 2 minutes otherwise. Each run starts the next one when it ends. GitHub's 5-minute schedule stays on only as a backup: it proved unreliable (once in 90 minutes on Nov 26, 2026).
 2. It reads ESPN's public scoreboard and play-by-play, finds new first scores, and sends ntfy alerts to `onlyfirst-<league>` and `onlyfirst-<league>-<team>`.
 3. It saves everything to `firsts.json` on the `data` branch.
 4. The website (GitHub Pages, `docs/` on `main`) reads that file from the `data` branch.
@@ -73,7 +73,7 @@ cd docs && python -m http.server 8000           # open http://localhost:8000
 ## Status at handoff (Nov 26, 2026)
 
 - **Pull request #1 is not merged yet.** The live site still shows the first, plain version.
-- **The tracker was run by hand once and worked.** It had not started on its own before that. Check the Actions tab: "Track first scores" should appear about every 5 minutes. If it doesn't, run it once with *Run workflow*.
+- **The tracker restarts itself.** A new "Track first scores" run should appear in the Actions tab about every 10 minutes. If the runs stop, start one with *Run workflow*. To pause the tracker, cancel the running run or disable the workflow.
 - **Phone alerts have not been seen arriving from GitHub yet.** Subscribe to `onlyfirst-nfl` in the ntfy app to confirm the next one.
 - **The Spanish and French text needs a native speaker's review.**
 

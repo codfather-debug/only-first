@@ -1,9 +1,12 @@
 name: Track first scores
 
-# Every 5 minutes GitHub starts this job. While games are live it keeps checking
-# every 30 seconds for ~9 minutes, so coverage is continuous even when GitHub
-# runs the schedule late. Only one run at a time (see concurrency).
-# Re-saved Nov 26, 2026 so GitHub registers the schedule.
+# Each run checks for ~9 minutes (every 30 s while a game is live, every 2 min
+# otherwise), then starts the next run itself. GitHub's schedule is unreliable
+# (on Nov 26, 2026 it fired once in 90 minutes and missed a first TD), so the
+# schedule below is only a backup that restarts the relay if it ever breaks.
+# Only one run at a time, and GitHub keeps at most one waiting (see concurrency),
+# so extra starts collapse into one. To stop the tracker, disable this workflow
+# (cancelling the running run also stops the relay until the schedule restarts it).
 on:
   schedule:
     - cron: "*/5 * * * *"
@@ -11,6 +14,7 @@ on:
 
 permissions:
   contents: write
+  actions: write  # to start the next run
 
 concurrency:
   group: tracker
@@ -37,7 +41,7 @@ jobs:
         env:
           ONLY_FIRST_DATA_DIR: data-branch
           ONLY_FIRST_WEBHOOK_URL: ${{ secrets.ONLY_FIRST_WEBHOOK_URL }}
-        run: python -m only_first update --for-minutes 9
+        run: python -m only_first update --for-minutes 9 --stay
 
       - name: Save score data
         working-directory: data-branch
@@ -48,3 +52,11 @@ jobs:
           if git diff --cached --quiet; then echo "no changes"; exit 0; fi
           git commit -q -m "Update first scores"
           git push
+
+      - name: Start the next run
+        # Even if a step above failed, so one bad run doesn't stop the tracker.
+        # Not when cancelled: cancelling a run is how to pause the relay.
+        if: success() || failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run track.yml --ref main
