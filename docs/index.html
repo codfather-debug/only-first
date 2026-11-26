@@ -29,20 +29,23 @@
       <span class="brand-name">Only First</span>
     </a>
     <nav class="tabs" aria-label="Sections">
-      <a href="#latest" data-view="latest">Latest</a>
-      <a href="#teams" data-view="teams">My teams</a>
-      <a href="#stats" data-view="stats">Stats</a>
+      <a href="#latest" data-view="latest" data-i18n="tab.latest">Latest</a>
+      <a href="#teams" data-view="teams" data-i18n="tab.teams">My teams</a>
+      <a href="#stats" data-view="stats" data-i18n="tab.stats">Stats</a>
     </nav>
   </div>
   <div class="wrap filter-row">
     <div class="chips" role="group" aria-label="Filter games">
-      <button data-league="all" aria-pressed="true">All</button>
-      <button data-league="nba" aria-pressed="false"><span class="emo" aria-hidden="true">🏀 </span>NBA</button>
-      <button data-league="nhl" aria-pressed="false"><span class="emo" aria-hidden="true">🏒 </span>NHL</button>
-      <button data-league="nfl" aria-pressed="false"><span class="emo" aria-hidden="true">🏈 </span>NFL</button>
-      <button id="mine-only" class="mine-chip" aria-pressed="false" title="Show only the teams you follow">★ My teams</button>
+      <button data-league="all" aria-pressed="true" data-i18n="filter.all">All</button>
+      <button data-league="nba" aria-pressed="false"><span class="emo" aria-hidden="true">🏀 </span><span class="lname">NBA</span></button>
+      <button data-league="nhl" aria-pressed="false"><span class="emo" aria-hidden="true">🏒 </span><span class="lname">NHL</span></button>
+      <button data-league="nfl" aria-pressed="false"><span class="emo" aria-hidden="true">🏈 </span><span class="lname">NFL</span></button>
+      <button id="mine-only" class="mine-chip" aria-pressed="false" data-i18n="filter.mine">★ My teams</button>
     </div>
-    <button class="install" id="install">Install app</button>
+    <button class="install" id="install" data-i18n="install">Install app</button>
+    <button class="gear" id="settings-btn" aria-haspopup="dialog" data-i18n-label="settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="6" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="18" cy="18" r="2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+    </button>
   </div>
 </header>
 
@@ -54,11 +57,13 @@
 </main>
 
 <footer class="wrap foot">
-  <p>NBA tracks the first points, NHL the first goal, NFL the first touchdown. Data comes from ESPN's public feeds and is checked every few minutes.
+  <p><span data-i18n="foot.what">NBA tracks the first points, NHL the first goal, NFL the first touchdown. Data comes from ESPN's public feeds and is checked every few minutes.</span>
   <span id="updated"></span></p>
 </footer>
 <div id="tip" class="tip-box" role="tooltip" hidden></div>
 <div id="toast" class="toast" role="status" hidden></div>
+<dialog id="settings" class="sheet" aria-labelledby="settings-title"><div id="settings-body"></div></dialog>
+<script src="i18n.js"></script>
 <script src="brand.js"></script>
 <script>document.getElementById("brand-mark").outerHTML = window.OFBrand.mark(34);</script>
 <script src="maps.js"></script>

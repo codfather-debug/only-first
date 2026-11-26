@@ -81,13 +81,13 @@
     ctx.fillStyle = o.ink; ctx.textBaseline = "middle";
     ctx.font = `700 56px ${D}`; ctx.fillText("Only First", 160, 100);
     ctx.textAlign = "right"; ctx.font = `600 34px ${B}`; ctx.globalAlpha = 0.9;
-    ctx.fillText(`${LNAME[o.game.league]}  ${o.game.name}`, W - 64, 84);
+    ctx.fillText(`${o.leagueName || LNAME[o.game.league]}  ${o.game.name}`, W - 64, 84);
     ctx.font = `500 28px ${B}`; ctx.fillText(o.dateText, W - 64, 124);
     ctx.globalAlpha = 1; ctx.textAlign = "left";
 
     // Kicker + name
     ctx.textBaseline = "alphabetic";
-    ctx.font = `600 40px ${B}`; ctx.fillText(`${WHAT[o.game.league]}: ${o.team.name}`, 64, 250);
+    ctx.font = `600 40px ${B}`; ctx.fillText(o.kicker || `${WHAT[o.game.league]}: ${o.team.name}`, 64, 250);
     const name = o.first.scorer.toUpperCase();
     const size = fitText(ctx, name, W - 128, 150, 700, D);
 
@@ -112,10 +112,11 @@
     const leftW = W - 128 - (map ? mapW + 40 : 0);
     ctx.fillStyle = "#12151c"; ctx.font = `700 52px ${D}`;
     let y = panelY + 90;
-    for (const line of wrap(ctx, o.first.how, leftW).slice(0, 3)) { ctx.fillText(line, 64, y); y += 56; }
+    for (const line of wrap(ctx, o.howText || o.first.how, leftW).slice(0, 3)) { ctx.fillText(line, 64, y); y += 56; }
     ctx.fillStyle = "#545b68"; ctx.font = `500 34px ${B}`;
     y += 10; ctx.fillText(`${o.periodText || o.first.period} ${o.first.clock}`, 64, y);
-    if (o.first.assists?.length) { y += 48; for (const l of wrap(ctx, `Assist: ${o.first.assists.join(", ")}`, leftW).slice(0, 2)) { ctx.fillText(l, 64, y); y += 44; } y -= 44; }
+    const assist = o.assistText ?? (o.first.assists?.length ? `Assist: ${o.first.assists.join(", ")}` : "");
+    if (assist) { y += 48; for (const l of wrap(ctx, assist, leftW).slice(0, 2)) { ctx.fillText(l, 64, y); y += 44; } y -= 44; }
     if (o.result) { y += 60; ctx.fillStyle = o.result.won ? "#0f7a2a" : "#545b68"; ctx.font = `700 36px ${B}`; ctx.fillText(o.result.text, 64, y); }
     if (map) {
       let mw = mapW, mh = mapW * (map.height / map.width);
@@ -135,7 +136,7 @@
   async function share(o) {
     const blob = await render(o);
     const file = new File([blob], `only-first-${o.game.league}-${o.game.id}.png`, { type: "image/png" });
-    const text = `${WHAT[o.game.league]}: ${o.first.scorer} (${o.first.team}), ${o.first.how}. ${o.game.name}`;
+    const text = `${o.kicker ? o.kicker.split(":")[0] : WHAT[o.game.league]}: ${o.first.scorer} (${o.first.team}), ${o.howText || o.first.how}. ${o.game.name}`;
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try { await navigator.share({ files: [file], title: "Only First", text: `${text} ${o.link}` }); return "shared"; }
       catch (e) { if (e.name === "AbortError") return "cancelled"; }
