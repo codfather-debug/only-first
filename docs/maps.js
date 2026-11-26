@@ -126,5 +126,27 @@
     return `<svg class="bigmap field" viewBox="${NFL_VIEW}" role="img" aria-label="Where first touchdowns started">${fieldLines("var(--surface-2)")}<g class="marks">${marks}</g></svg>`;
   }
 
-  window.OFMaps = { mini, season };
+  // ------------------------------------------------------------ public: self-contained SVG (for share images)
+  // Page CSS doesn't reach an SVG drawn into a canvas, so styles are embedded.
+  const STANDALONE_CSS = `
+    .lines{color:#8d939e}.lines .red{stroke:#d23a3a}.lines .blue{stroke:#2f6bd6;stroke-width:1.4}
+    .lines .dot{fill:#d23a3a}.lines .crease{fill:rgba(80,150,230,.25)}.lines .mid{stroke-width:.9}
+    .mark{stroke:#fff;stroke-width:.9}.shotline{stroke-width:1;stroke-dasharray:2 2;opacity:.7}
+    .play{fill:none;stroke-width:2.2;stroke-linecap:round}.play.pass{stroke-dasharray:3 2.5}
+    .ball{fill:#fff;stroke:rgba(0,0,0,.4);stroke-width:.5}.ft{font:700 4.4px Arial,sans-serif;fill:#545b68;text-anchor:middle}`;
+  function standalone(league, first, color, px = 600) {
+    const svg = mini(league, first, color);
+    if (!svg) return "";
+    const view = { nba: NBA_VIEW, nhl: NHL_VIEW, nfl: NFL_VIEW }[league].split(" ").map(Number);
+    const bg = { nba: "#f6f3ec", nhl: "#f4f8fb", nfl: "#2f7d46" }[league];
+    const w = px, h = Math.round((px * view[3]) / view[2]);
+    let inner = svg.replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "");
+    if (league === "nfl") inner = inner.replace(/class="lines"/, 'class="lines" style="color:rgba(255,255,255,.6)"').replace(/class="play /, 'style="stroke:#fff" class="play ');
+    inner = inner.replace(/vector-effect="non-scaling-stroke"/g, "");
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${view.join(" ")}" width="${w}" height="${h}">
+      <style>${STANDALONE_CSS}</style>
+      <rect x="${view[0]}" y="${view[1]}" width="${view[2]}" height="${view[3]}" fill="${bg}"/>${inner}</svg>`;
+  }
+
+  window.OFMaps = { mini, season, standalone };
 })();

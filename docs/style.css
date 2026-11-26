@@ -67,7 +67,9 @@ button, select { font: inherit; color: inherit; }
 .filter-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px 12px; flex-wrap: wrap; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chips button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 13px; font-size: 15px; font-weight: 600; cursor: pointer; color: var(--text-2); }
-.chips button[aria-checked="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
+.chips button[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
+.chips .mine-chip { margin-left: 4px; }
+.chips .mine-chip[aria-pressed="true"] { background: var(--amber); color: #12151c; border-color: var(--amber); }
 .toggle { display: flex; align-items: center; gap: 6px; font-size: 15px; color: var(--text-2); cursor: pointer; }
 .toggle input { accent-color: var(--accent); width: 17px; height: 17px; }
 .install { display: none; border: 0; border-radius: 8px; padding: 6px 11px; background: var(--amber); color: #12151c; font-weight: 700; cursor: pointer; }
@@ -233,3 +235,76 @@ tr.mine td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
   .grid { grid-template-columns: 1fr; }
   .day .tally { margin-left: 0; }
 }
+
+/* ---------------------------------------------------------------- card actions, share, toast */
+.card-actions { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 0 14px 12px; }
+.play-text { font-size: 14px; color: var(--text-2); min-width: 0; }
+.play-text summary { cursor: pointer; font-weight: 600; color: var(--text-3); list-style-position: inside; }
+.play-text p { margin: 6px 0 0; }
+.share { display: inline-flex; align-items: center; gap: 6px; flex: none; border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 999px; padding: 5px 12px; font-size: 14px; font-weight: 700; cursor: pointer; }
+.share:hover { border-color: var(--tc, var(--accent)); }
+.share:disabled { opacity: .6; cursor: progress; }
+.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 60; background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+
+/* ---------------------------------------------------------------- audit fixes */
+/* live games */
+.live-pill { display: inline-flex; align-items: center; gap: 6px; background: #d6331f; color: #fff; padding: 2px 9px 2px 7px; border-radius: 99px; font-weight: 700; }
+.live-pill .live-dot { background: #fff; }
+.card.is-live { box-shadow: 0 0 0 2px var(--live), var(--card-shadow); border-color: transparent; }
+.card.is-live .waiting { color: var(--live); }
+
+/* compact upcoming / no-score cards */
+.card.pending .hero { min-height: 0; padding: 10px 14px 12px; }
+.card.pending .vs { margin-top: 6px; }
+.card.pending .vs img { width: 42px; height: 42px; }
+.card.pending .vs span { font-size: 18px; padding: 3px 7px; }
+.card.pending .body { padding: 10px 14px; }
+
+/* map captions */
+.mapfig { margin: 0; display: grid; gap: 4px; justify-items: center; }
+.mapfig figcaption { font-size: 13px; color: var(--text-3); text-align: center; max-width: 140px; line-height: 1.25; }
+
+/* first-visit intro */
+.intro { margin: 20px 0 4px; padding: 14px 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); border-left: 6px solid var(--amber); display: flex; gap: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.intro p { margin: 0; max-width: 62ch; color: var(--text-2); }
+.intro p b { color: var(--text); }
+.intro-actions { display: flex; gap: 8px; }
+.fresh { color: var(--text-3); font-size: 14px; }
+
+/* loading skeleton */
+.skeleton .hero { background: var(--surface-2); min-height: 118px; }
+.skeleton .hero::after { display: none; }
+.sk { height: 14px; border-radius: 6px; background: var(--surface-2); margin: 4px 0 10px; }
+.sk.w70 { width: 70%; } .sk.w40 { width: 40%; }
+.sk-h { width: 140px; height: 28px; border-radius: 8px; background: var(--surface-2); }
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton .hero, .sk, .sk-h { animation: shimmer 1.3s ease-in-out infinite; }
+  @keyframes shimmer { 50% { opacity: .55; } }
+}
+
+/* comfortable touch targets */
+@media (pointer: coarse) {
+  .chips button, .tabs a, .share, .btn, .more, .team-btn, .map-tools select { min-height: 40px; }
+  .chips button { padding: 6px 14px; }
+  .tabs a { display: inline-flex; align-items: center; }
+  .play-text summary { padding: 10px 0; }
+}
+
+@media (max-width: 560px) {
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tile { padding: 10px 12px; }
+  .tile .v { font-size: 30px; }
+  .tile .k { font-size: 14px; line-height: 1.25; }
+  .league-block > h2 { font-size: 30px; }
+  .intro-actions { width: 100%; }
+}
+
+@media (max-width: 560px) {
+  .filter-row { padding-top: 8px; padding-bottom: 10px; }
+  .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chips button { flex: none; padding: 6px 12px; }
+  .chips .emo { display: none; }
+}
+
+#alerts { scroll-margin-top: 130px; }

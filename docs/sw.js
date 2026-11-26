@@ -1,7 +1,7 @@
 /* Only First service worker: the app shell works offline; scores always come fresh. */
-const SHELL = "of-shell-v2";
+const SHELL = "of-shell-v4";
 const IMAGES = "of-img-v1";
-const SHELL_FILES = ["./", "index.html", "style.css", "app.js", "maps.js", "brand.js", "teams.json",
+const SHELL_FILES = ["./", "index.html", "style.css", "app.js", "maps.js", "brand.js", "share.js", "teams.json",
   "config.json", "manifest.webmanifest", "icon.svg", "icons/icon-192.png"];
 
 self.addEventListener("install", (e) => {

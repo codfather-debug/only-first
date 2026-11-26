@@ -14,7 +14,7 @@
   const state = {
     config: {}, teams: {}, teamIdx: {}, games: [], updated: null,
     view: "latest", league: "all", mineOnly: false, mine: new Set(),
-    daysShown: DAYS_PER_PAGE, seen: new Set(), firstLoad: true, mapTeam: {},
+    daysShown: DAYS_PER_PAGE, seen: new Set(), firstLoad: true, mapTeam: {}, statsLeague: "nba", introDone: false,
   };
 
   // ---------------------------------------------------------------- storage (best effort)
@@ -60,6 +60,7 @@
     if (diff === -1) return ["Tomorrow", long];
     return [d.toLocaleDateString(undefined, { weekday: "long" }), d.toLocaleDateString(undefined, { month: "long", day: "numeric" })];
   }
+  const periodLabel = (lg, p) => (lg === "nba" ? String(p || "").replace(/^(\d)(?:st|nd|rd|th) Quarter$/, "Q$1") : p || "");
   const startTime = (iso) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
   // ---------------------------------------------------------------- data
@@ -121,6 +122,15 @@
     return out.length ? `<div class="facts">${out.join("")}</div>` : "";
   }
 
+  function mapCaption(lg, f) {
+    const s = f.spot || {};
+    if (lg === "nba") return s.ft ? "At the line" : s.x != null ? `${Math.round(Math.hypot(s.x - 25, s.y))} ft out` : "";
+    if (lg === "nhl") return s.x != null ? `${Math.round(Math.hypot(89 - s.x, s.y))} ft from the net` : "";
+    if (s.yards == null) return "";
+    const kind = /pass/i.test(f.how) ? "pass" : /return|recovery/i.test(f.how) ? "return" : "run";
+    return `${s.yards}-yard ${kind}${s.lane ? `, ${s.lane}` : ""}`;
+  }
+
   function card(g) {
     const f = g.first;
     const key = `${g.league}:${g.id}`;
@@ -134,26 +144,32 @@
       const img = photo
         ? `<img class="shot" src="${esc(photo)}" data-fallback="${esc(t.logo)}" alt="" width="112" height="82" loading="lazy">`
         : `<img class="shot logo-fallback" src="${esc(t.logo)}" alt="" width="64" height="64" loading="lazy">`;
-      const map = window.OFMaps.mini(g.league, f, hex(t.color));
+      const svg = window.OFMaps.mini(g.league, f, hex(t.color));
+      const map = svg ? `<figure class="mapfig">${svg}<figcaption>${esc(mapCaption(g.league, f))}</figcaption></figure>` : "";
       const assists = f.assists?.length ? `<p class="assist">Assist: ${f.assists.map(esc).join(", ")}</p>` : "";
-      return `<article class="card${isNew ? " is-new" : ""}" style="${teamVars(t)}" title="${esc(f.description)}">
+      return `<article class="card${isNew ? " is-new" : ""}" id="g-${g.league}-${esc(g.id)}" style="${teamVars(t)}">
         <div class="hero">
           ${t.logo ? `<img class="wm" src="${esc(t.logo)}" alt="" loading="lazy">` : ""}
           <div class="hero-top"><span class="lg">${LNAME[g.league]}</span><span>${esc(g.name)}</span>${po}
-            <span class="when">${esc(f.period)} ${esc(f.clock)}</span></div>
+            <span class="when">${esc(periodLabel(g.league, f.period))} ${esc(f.clock)}</span></div>
           <div class="who">${img}<h3><small>${esc(t.name)}</small>${esc(f.scorer)}</h3></div>
         </div>
         <div class="body"><div><p class="how">${esc(f.how)}</p>${assists}${facts(g)}</div>${map}</div>
+        <div class="card-actions">
+          <details class="play-text"><summary>Play-by-play</summary><p>${esc(f.description)}</p></details>
+          <button class="share" data-share="${g.league}:${esc(g.id)}" aria-label="Share ${esc(f.scorer)}'s ${WHAT[g.league]}">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Share</button>
+        </div>
       </article>`;
     }
 
     const home = team(g.league, g.home), away = team(g.league, g.away);
     let msg, when;
-    if (g.state === "in") { msg = `Waiting for the ${WHAT[g.league]}`; when = `<span class="live" style="color:#fff"><span class="live-dot"></span>Live</span>`; }
+    if (g.state === "in") { msg = `Live now. Waiting for the ${WHAT[g.league]}.`; when = `<span class="live-pill"><span class="live-dot"></span>Live</span>`; }
     else if (g.state === "pre") { msg = `${{ nba: "Tip-off", nhl: "Puck drop", nfl: "Kickoff" }[g.league]} at ${startTime(g.start)}`; when = "Upcoming"; }
     else { msg = g.league === "nfl" ? "No touchdowns this game" : g.league === "nhl" ? "Scoreless, decided in a shootout" : "No score recorded"; when = "Final"; }
     const style = `--c1:${hex(away.color)};--c2:${hex(home.color)};--on:#fff`;
-    return `<article class="card pending" style="${style}">
+    return `<article class="card pending${g.state === "in" ? " is-live" : ""}" style="${style}">
       <div class="hero">
         <div class="hero-top"><span class="lg">${LNAME[g.league]}</span><span>${esc(g.name)}</span>${po}<span class="when">${when}</span></div>
         <div class="vs">${away.logo ? `<img src="${esc(away.logo)}" alt="${esc(away.name)}">` : ""}<span>at</span>${home.logo ? `<img src="${esc(home.logo)}" alt="${esc(home.name)}">` : ""}</div>
@@ -175,18 +191,33 @@
     for (const g of games) { if (!byDay.has(g.date)) byDay.set(g.date, []); byDay.get(g.date).push(g); }
     const days = [...byDay.keys()].sort().reverse();
     const order = { in: 0, post: 1, pre: 2 };
-    const html = days.slice(0, state.daysShown).map((d) => {
+    const intro = state.introDone ? "" : `<div class="intro">
+        <p><b>One card per game: who scored first, and how.</b> The first points in the NBA, the first goal in the NHL, the first touchdown in the NFL.</p>
+        <div class="intro-actions"><a class="btn" href="#teams">Pick your teams</a><button class="btn ghost" data-dismiss-intro>Got it</button></div></div>`;
+    const html = days.slice(0, state.daysShown).map((d, i) => {
       const list = byDay.get(d).sort((a, b) => order[a.state] - order[b.state] ||
         (a.state === "pre" ? (a.start || "").localeCompare(b.start || "") : (b.start || "").localeCompare(a.start || "")));
       const [big, small] = dayLabel(d);
       const n = list.filter((g) => g.first).length;
+      const fresh = i === 0 && state.updated ? `<span class="fresh">${esc(freshness())}</span>` : "";
       return `<div class="day"><h2>${big}</h2><span class="date">${small}</span>
-          <span class="tally">${n} of ${list.length} games decided</span></div>
+          <span class="tally">${n} of ${list.length} games decided</span>${fresh}</div>
         <div class="grid">${list.map(card).join("")}</div>`;
     }).join("");
     const more = days.length > state.daysShown ? `<button class="more" id="more">Show earlier days</button>` : "";
-    el.innerHTML = html + more;
+    el.innerHTML = intro + html + more;
     $("#more")?.addEventListener("click", () => { state.daysShown += DAYS_PER_PAGE; renderLatest(); });
+  }
+
+  function freshness() {
+    const mins = Math.max(0, Math.round((Date.now() - new Date(state.updated)) / 60000));
+    return `Updated ${mins < 1 ? "just now" : mins < 120 ? `${mins} min ago` : `${Math.round(mins / 60)} hours ago`}`;
+  }
+
+  function skeleton() {
+    const one = `<div class="card skeleton"><div class="hero"></div><div class="body"><div><p class="sk w70"></p><p class="sk w40"></p></div></div></div>`;
+    $("#view-latest").hidden = false;
+    $("#view-latest").innerHTML = `<div class="day"><h2 class="sk-h"></h2></div><div class="grid">${one.repeat(6)}</div>`;
   }
 
   // ---------------------------------------------------------------- teams view
@@ -220,8 +251,8 @@
     const el = $("#view-teams");
     const leagues = state.league === "all" ? LEAGUES : [state.league];
     const pickers = leagues.map((lg) => `
-      <div class="panel"><h2>${EMOJI[lg]} ${LNAME[lg]}</h2>
-        <p>Tap the teams you follow.</p>
+      <div class="panel"><h2>${EMOJI[lg]} ${LNAME[lg]} teams</h2>
+        <p>Tap the teams you follow. Their games get a topic for alerts below, and the ★ filter shows just them.</p>
         <div class="team-grid">${(state.teams[lg] || []).map((t) => {
           const on = state.mine.has(teamKey(lg, t.abbr));
           return `<button class="team-btn" aria-pressed="${on}" data-team="${teamKey(lg, t.abbr)}" style="--tc:${hex(t.color)}">
@@ -232,9 +263,14 @@
     const rows = mine.map(([lg, abbr]) => { const t = team(lg, abbr); return topicRow(`${t.name} (${LNAME[lg]})`, topicFor(lg, abbr), t.logo); }).join("");
     const all = leagues.map((lg) => topicRow(`Every ${LNAME[lg]} game`, topicFor(lg))).join("");
 
+    const following = state.mine.size
+      ? `<div class="intro"><p>You follow <b>${state.mine.size} team${state.mine.size === 1 ? "" : "s"}</b>. Turn on alerts so you hear the moment they score first.</p>
+          <div class="intro-actions"><button class="btn" data-goto-alerts>Set up alerts</button></div></div>`
+      : "";
     el.innerHTML = `
-      ${homeScreenPanel()}
-      <div class="panel">
+      ${following}
+      ${pickers}
+      <div class="panel" id="alerts">
         <h2>Get alerts on your phone</h2>
         <p>Free push notifications through <a href="https://ntfy.sh" target="_blank" rel="noopener">ntfy</a>. No account or email needed.</p>
         <ol class="steps">
@@ -246,7 +282,7 @@
         ${rows ? `<h3>Your teams</h3><ul class="topics">${rows}</ul><br>` : `<p><i>Pick teams below to get a topic for each one.</i></p>`}
         <h3>Every game</h3><ul class="topics">${all}</ul>
       </div>
-      ${pickers}`;
+      ${homeScreenPanel()}`;
   }
 
   // ---------------------------------------------------------------- stats view
@@ -370,9 +406,9 @@
       </div></div>`;
   }
 
+  const statsLeague = () => (state.league === "all" ? state.statsLeague : state.league);
   function renderStats() {
-    const leagues = state.league === "all" ? LEAGUES : [state.league];
-    $("#view-stats").innerHTML = leagues.map(leagueStats).join("");
+    $("#view-stats").innerHTML = leagueStats(statsLeague());
   }
 
   // ---------------------------------------------------------------- shell
@@ -381,19 +417,22 @@
     document.querySelectorAll(".tabs a").forEach((a) => {
       if (a.dataset.view === state.view) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     });
-    document.querySelectorAll(".chips button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.league === state.league)));
-    $("#mine-toggle").hidden = state.view !== "latest";
-    $("#mine-only").checked = state.mineOnly;
+    const active = state.view === "stats" ? statsLeague() : state.league;
+    document.querySelectorAll(".chips button[data-league]").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.league === active));
+      b.hidden = state.view === "stats" && b.dataset.league === "all";
+    });
+    const mineBtn = $("#mine-only");
+    mineBtn.hidden = state.view !== "latest";
+    mineBtn.setAttribute("aria-pressed", String(state.mineOnly));
     ({ latest: renderLatest, teams: renderTeams, stats: renderStats })[state.view]();
-    if (state.updated) {
-      const mins = Math.max(0, Math.round((Date.now() - new Date(state.updated)) / 60000));
-      $("#updated").textContent = `Last checked ${mins < 1 ? "just now" : mins < 120 ? `${mins} min ago` : `${Math.round(mins / 60)} hours ago`}.`;
-    }
+    if (state.updated) $("#updated").textContent = `${freshness()}.`;
     state.firstLoad = false;
   }
 
   function route() {
     const v = location.hash.replace("#", "");
+    if (v.startsWith("game=")) { focusGame(v.slice(5)); return; }
     state.view = ["latest", "teams", "stats"].includes(v) ? v : "latest";
     render();
   }
@@ -401,9 +440,14 @@
   function wire() {
     document.querySelector(".chips").addEventListener("click", (e) => {
       const b = e.target.closest("button[data-league]"); if (!b) return;
+      if (state.view === "stats" && b.dataset.league !== "all") { state.statsLeague = b.dataset.league; store.set("statsLeague", state.statsLeague); }
       state.league = b.dataset.league; store.set("league", state.league); state.daysShown = DAYS_PER_PAGE; render();
     });
-    $("#mine-only").addEventListener("change", (e) => { state.mineOnly = e.target.checked; store.set("mineOnly", state.mineOnly); render(); });
+    $("#mine-only").addEventListener("click", () => {
+      state.mineOnly = !state.mineOnly; store.set("mineOnly", state.mineOnly);
+      if (state.mineOnly && !state.mine.size) { location.hash = "#teams"; return; }
+      render();
+    });
     $("#view-teams").addEventListener("click", async (e) => {
       const t = e.target.closest("[data-team]");
       if (t) {
@@ -414,6 +458,7 @@
         return;
       }
       if (e.target.closest("[data-install]")) { install(); return; }
+      if (e.target.closest("[data-goto-alerts]")) { $("#alerts").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
       const c = e.target.closest("[data-copy]");
       if (c) {
         try { await navigator.clipboard.writeText(c.dataset.copy); c.textContent = "Copied"; }
@@ -434,15 +479,70 @@
     }, true);
     // Hover tooltips for bars and map marks.
     const tip = $("#tip");
-    document.addEventListener("pointermove", (e) => {
+    const showTip = (e) => {
       const r = e.target.closest?.("[data-tip]");
-      if (!r) { tip.hidden = true; return; }
+      if (!r) { tip.hidden = true; return false; }
       tip.textContent = r.dataset.tip; tip.hidden = false;
       const x = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 8);
-      tip.style.left = `${Math.max(8, x)}px`; tip.style.top = `${e.clientY + 16}px`;
+      const y = e.clientY + 16 + tip.offsetHeight > window.innerHeight ? e.clientY - tip.offsetHeight - 12 : e.clientY + 16;
+      tip.style.left = `${Math.max(8, x)}px`; tip.style.top = `${y}px`;
+      return true;
+    };
+    document.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse") showTip(e); });
+    // Touch: tap a dot or bar to see its details; tap elsewhere to hide.
+    document.addEventListener("pointerup", (e) => {
+      if (e.pointerType === "mouse") return;
+      clearTimeout(showTip.t);
+      if (showTip(e)) showTip.t = setTimeout(() => { tip.hidden = true; }, 3500);
     });
     window.addEventListener("hashchange", route);
     $("#install").addEventListener("click", install);
+    $("#view-latest").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-share]"); if (b) shareGame(b);
+      if (e.target.closest("[data-dismiss-intro]")) { state.introDone = true; store.set("introDone", true); renderLatest(); }
+    });
+  }
+
+  // ---------------------------------------------------------------- share a first score
+  const siteUrl = () => (state.config.site_url || location.href.split("#")[0]);
+  async function shareGame(btn) {
+    const g = state.games.find((x) => `${x.league}:${x.id}` === btn.dataset.share);
+    if (!g || !g.first) return;
+    const t = team(g.league, g.first.team);
+    const w = winnerOf(g);
+    const label = btn.innerHTML;
+    btn.disabled = true; btn.textContent = "Making image…";
+    try {
+      const how = await window.OFShare.share({
+        game: g, team: t, first: g.first, periodText: periodLabel(g.league, g.first.period),
+        photo: headshot(g.league, g.first.scorer_id, 700, 510), logo: t.logo,
+        color: hex(t.color), alt: hex(t.alt), ink: inkOn(t.color),
+        url: siteUrl(), link: `${siteUrl()}#game=${g.league}-${g.id}`,
+        dateText: new Date(+g.date.slice(0, 4), +g.date.slice(4, 6) - 1, +g.date.slice(6, 8)).toLocaleDateString(undefined, { weekday: "short", month: "long", day: "numeric" }),
+        result: w ? { won: w === g.first.team, text: w === g.first.team ? `Scored first and won, ${g.home_score > g.away_score ? g.home_score + "–" + g.away_score : g.away_score + "–" + g.home_score}` : `Scored first, ${w} won` } : null,
+      });
+      toast(how === "downloaded" ? "Image saved. Link copied." : how === "shared" ? "Shared" : "");
+    } catch (e) { console.error(e); toast("Couldn't make the image. Try again."); }
+    finally { btn.disabled = false; btn.innerHTML = label; }
+  }
+
+  function toast(msg) {
+    if (!msg) return;
+    const el = $("#toast"); el.textContent = msg; el.hidden = false;
+    clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, 2600);
+  }
+
+  // Deep link: #game=nba-401910036 opens that card.
+  function focusGame(ref) {
+    const [lg, id] = ref.split("-");
+    const g = state.games.find((x) => x.league === lg && x.id === id);
+    if (!g) return;
+    state.league = "all"; state.mineOnly = false;
+    const days = [...new Set(state.games.map((x) => x.date))].sort().reverse();
+    state.daysShown = Math.max(state.daysShown, days.indexOf(g.date) + 1);
+    state.view = "latest"; render();
+    const el = document.getElementById(`g-${lg}-${id}`);
+    if (el) { el.scrollIntoView({ block: "center" }); el.classList.add("is-new"); }
   }
 
   // ---------------------------------------------------------------- install as an app (PWA)
@@ -472,10 +572,13 @@
     state.league = store.get("league", "all");
     state.mineOnly = store.get("mineOnly", false);
     state.mine = new Set(store.get("mine", []));
+    state.statsLeague = store.get("statsLeague", "nba");
+    state.introDone = store.get("introDone", false);
     wire();
-    $("#status").textContent = "Loading scores…";
+    if (!location.hash || location.hash === "#latest") skeleton();
     try { await loadStatic(); } catch (e) { $("#status").textContent = "The team list didn't load. Reload the page to try again."; return; }
     await refresh();
+    if (!state.games.length) $("#view-latest").innerHTML = "";
     for (const g of state.games) if (g.first) state.seen.add(`${g.league}:${g.id}`);
     route();
     setInterval(() => { if (!document.hidden) refresh(); }, REFRESH_MS);
