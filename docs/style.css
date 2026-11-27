@@ -217,6 +217,11 @@ tr:last-child td { border-bottom: 0; }
 td.n, th.n { text-align: right; }
 td.rank { color: var(--text-3); width: 1.6em; }
 tr.mine td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+tr.pick { cursor: pointer; }
+tr.pick:hover td { background: color-mix(in srgb, var(--text) 6%, transparent); }
+tr.pick.sel td { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+tr.pick.sel td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.pickbtn { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
 .tteam { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
 .tteam img { width: 20px; height: 20px; object-fit: contain; }
 .pface { width: 30px; height: 22px; object-fit: cover; object-position: top; vertical-align: middle; margin-right: 6px; border-radius: 4px; background: var(--surface-2); }

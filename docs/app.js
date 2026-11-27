@@ -409,13 +409,17 @@
     const tips = games.filter((g) => g.tip && g.tip.team);
     const tipThenFirst = tips.filter((g) => g.tip.team === g.first.team).length;
 
-    const leaders = count(games, (g) => `${g.first.scorer}|${g.first.team}|${g.first.scorer_id || ""}`).slice(0, 12);
+    const sel = state.mapTeam[lg] || "";
+    const selTeam = sel ? team(lg, sel) : null;
+    const leaderGames = sel ? games.filter((g) => g.first.team === sel) : games;
+    const leaders = count(leaderGames, (g) => `${g.first.scorer}|${g.first.team}|${g.first.scorer_id || ""}`).slice(0, 12);
     const leaderRows = leaders.map(([k, v], i) => {
       const [name, abbr, id] = k.split("|"); const tm = team(lg, abbr);
       const face = id ? `<img class="pface" src="${esc(headshot(lg, id, 60, 44))}" alt="" loading="lazy">` : "";
       return `<tr${state.mine.has(teamKey(lg, abbr)) ? ' class="mine"' : ""}><td class="rank">${i + 1}</td><td>${face}${esc(name)}</td>
         <td><span class="tteam"><img src="${esc(tm.logo)}" alt="">${esc(abbr)}</span></td><td class="n">${v}</td></tr>`;
-    }).join("");
+    }).join("") || `<tr><td colspan="4" class="empty">${esc(t("stats.noGames"))}</td></tr>`;
+    const leadersTitle = t(`leaders.title.${lg}`) + (selTeam ? ` · ${selTeam.short}` : "");
 
     const rows = (state.teams[lg] || []).map((tm) => {
       const played = games.filter((g) => g.home === tm.abbr || g.away === tm.abbr);
@@ -427,11 +431,14 @@
       return { tm, gp: played.length, first: first.length, p: played.length ? first.length / played.length : 0, fWon, fFinals: fFinals.length, tipsWon, tipped: tipped.length };
     }).filter((r) => r.gp).sort((a, b) => b.p - a.p || b.first - a.first);
     const tipCol = lg === "nba";
-    const teamRows = rows.map((r) => `<tr${state.mine.has(teamKey(lg, r.tm.abbr)) ? ' class="mine"' : ""}>
-      <td><span class="tteam"><img src="${esc(r.tm.logo)}" alt="">${esc(r.tm.short)}</span></td>
+    const teamRows = rows.map((r) => {
+      const cls = [state.mine.has(teamKey(lg, r.tm.abbr)) && "mine", r.tm.abbr === sel && "sel"].filter(Boolean).join(" ");
+      return `<tr class="pick ${cls}" data-pickteam="${esc(r.tm.abbr)}" data-league="${lg}">
+      <td><button type="button" class="tteam pickbtn" aria-pressed="${r.tm.abbr === sel}"><img src="${esc(r.tm.logo)}" alt="">${esc(r.tm.short)}</button></td>
       <td class="n">${r.first}/${r.gp}</td><td class="n"><b>${Math.round(r.p * 100)}%</b></td>
       <td class="n">${r.fFinals ? `${r.fWon}–${r.fFinals - r.fWon}` : "–"}</td>
-      ${tipCol ? `<td class="n">${r.tipped ? `${pct(r.tipsWon, r.tipped)}%` : "–"}</td>` : ""}</tr>`).join("");
+      ${tipCol ? `<td class="n">${r.tipped ? `${pct(r.tipsWon, r.tipped)}%` : "–"}</td>` : ""}</tr>`;
+    }).join("");
 
     const extra = lg === "nhl"
       ? `<div class="panel"><h3>${esc(t("nhl.situation"))}</h3>${bars(count(games, (g) => catLabel(strength(g.first.how))), games.length)}</div>`
@@ -456,7 +463,7 @@
         ${mapPanel(lg, games)}
         <div class="stack"><div class="panel"><h3>${esc(t(`how.title.${lg}`))}</h3>${bars(cats, games.length)}</div>
         ${extra}</div>
-        <div class="panel"><h3>${esc(t(`leaders.title.${lg}`))}</h3><table><thead><tr><th></th><th>${esc(t("th.player"))}</th><th>${esc(t("th.team"))}</th><th class="n">${esc(t("th.firsts"))}</th></tr></thead><tbody>${leaderRows}</tbody></table></div>
+        <div class="panel"><h3>${esc(leadersTitle)}</h3><table><thead><tr><th></th><th>${esc(t("th.player"))}</th><th>${esc(t("th.team"))}</th><th class="n">${esc(t("th.firsts"))}</th></tr></thead><tbody>${leaderRows}</tbody></table></div>
         <div class="panel"><h3>${esc(t("teamsFirst.title"))}</h3><div class="scroll"><table><thead><tr><th>${esc(t("th.team"))}</th><th class="n">${esc(t("th.first"))}</th><th class="n">${esc(t("th.rate"))}</th><th class="n" title="${esc(t("th.recordTip"))}">${esc(t("th.record"))}</th>${tipCol ? `<th class="n" title="${esc(t("th.tipsTip"))}">${esc(t("th.tips"))}</th>` : ""}</tr></thead><tbody>${teamRows}</tbody></table></div></div>
       </div></div>`;
   }
@@ -594,6 +601,12 @@
         catch { prompt(t("copy.prompt"), c.dataset.copy); }
         setTimeout(() => { c.textContent = t("btn.copy"); }, 1500);
       }
+    });
+    $("#view-stats").addEventListener("click", (e) => {
+      const row = e.target.closest("[data-pickteam]"); if (!row) return;
+      const lg = row.dataset.league, abbr = row.dataset.pickteam;
+      state.mapTeam[lg] = state.mapTeam[lg] === abbr ? "" : abbr;  // clicking the selected team again shows all
+      renderStats();
     });
     $("#view-stats").addEventListener("change", (e) => {
       const s = e.target.closest("[data-mapteam]"); if (!s) return;
