@@ -97,3 +97,27 @@ class TestSeasonCount(unittest.TestCase):
                          "3rd time this season scoring the game's first TD")
         self.assertEqual([self.m.ordinal(n) for n in (1, 2, 3, 4, 11, 12, 13, 21, 22, 111)],
                          ["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "111th"])
+
+
+class TestDiscordImage(unittest.TestCase):
+    def test_multipart_holds_payload_and_png(self):
+        from only_first.notify import multipart
+        body, ctype = multipart({"payload_json": '{"content": "hi"}'}, {"files[0]": ("a.png", b"\x89PNG data", "image/png")})
+        boundary = ctype.split("boundary=")[1]
+        self.assertTrue(body.endswith(f"--{boundary}--\r\n".encode()))
+        self.assertIn(b'name="payload_json"', body)
+        self.assertIn(b'name="files[0]"; filename="a.png"', body)
+        self.assertIn(b"\x89PNG data", body)
+
+    def test_share_options_match_the_website(self):
+        from only_first.extract import FirstScore
+        from only_first.shareimg import options
+        fs = FirstScore(league="nba", game_id="1", matchup="BOS @ NY", team="NY", scorer="Jalen Brunson",
+                        how="Jump Shot, 18 ft", period="1st Quarter", clock="11:20", description="", assists=[],
+                        scorer_id="3934672")
+        o = options(fs, {"date": "20261126", "name": "BOS @ NY"}, "2nd time this season scoring the game's first points", None)
+        self.assertEqual(o["periodText"], "Q1")
+        self.assertEqual(o["kicker"], "First points: New York Knicks")
+        self.assertEqual(o["dateText"], "Thu, November 26")
+        self.assertTrue(o["photo"].endswith("3934672.png&w=700&h=510&scale=crop&cquality=60"))
+        self.assertIn(o["ink"], ("#ffffff", "#12151c"))

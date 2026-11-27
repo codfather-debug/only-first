@@ -1,8 +1,8 @@
 /* Only First service worker: the app shell works offline; scores always come fresh. */
-const SHELL = "of-shell-v7";
+const SHELL = "of-shell-v8";
 const IMAGES = "of-img-v1";
 const SHELL_FILES = ["./", "index.html", "style.css", "app.js", "maps.js", "i18n.js", "brand.js", "share.js", "teams.json",
-  "config.json", "manifest.webmanifest", "icon.svg", "icons/icon-192.png"];
+  "config.json", "manifest.webmanifest", "icon.svg", "icons/icon-192.png", "logo.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(SHELL).then((c) => c.addAll(SHELL_FILES)).then(() => self.skipWaiting()));

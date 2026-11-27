@@ -1,0 +1,22 @@
+<!doctype html>
+<!-- Draws one share image for the tracker (only_first/shareimg.py), which screenshots it in headless Chrome.
+     The image options arrive as JSON in the URL hash. Not part of the website. -->
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>html, body { margin: 0; width: 1080px; height: 1350px; overflow: hidden; background: #fff; } canvas { display: block; }</style>
+</head><body>
+<script src="../docs/maps.js"></script>
+<script src="../docs/share.js"></script>
+<script>
+  (async () => {
+    try {
+      const o = JSON.parse(decodeURIComponent(location.hash.slice(1)));
+      // Fonts load only once used, so ask for each one before drawing.
+      await Promise.all(['700 100px "Barlow Condensed"', '600 40px Barlow', '500 30px Barlow', '700 36px Barlow']
+        .map((f) => document.fonts.load(f)));
+      document.body.appendChild(await window.OFShare.draw(o));
+      document.title = "ready";
+    } catch (e) { document.title = "error: " + e; }
+  })();
+</script>
+</body></html>

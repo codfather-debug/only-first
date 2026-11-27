@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import espn, notify
+from . import espn, notify, shareimg
 from .extract import EXTRACTORS, SCHEMA, tipoff_nba
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -134,7 +134,8 @@ def process_date(store: dict, league: str, day: str, alert: bool) -> int:
             new += 1
             note = season_note(store, league, day, rec["first"])
             if alert:
-                notify.send(fs, [g["home"], g["away"]], prefix, site, note)
+                notify.send(fs, [g["home"], g["away"]], prefix, site, note,
+                            image=lambda: shareimg.image(fs, rec, note, site))
             else:
                 notify.console(fs, note)
     return new

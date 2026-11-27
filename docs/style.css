@@ -61,6 +61,7 @@ button, select { font: inherit; color: inherit; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); }
 .brand svg { width: 34px; height: 34px; flex: none; border-radius: 8px; }
 .brand-name { font: 700 28px/1 var(--display); letter-spacing: .01em; }
+.brand-logo { display: block; height: 44px; width: auto; }
 .tabs { display: flex; gap: 2px; background: var(--surface-2); padding: 3px; border-radius: 10px; }
 .tabs a { padding: 6px 12px; border-radius: 8px; text-decoration: none; color: var(--text-2); font-weight: 600; font-size: 15px; white-space: nowrap; }
 .tabs a[aria-current="page"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
@@ -348,6 +349,7 @@ tr.mine td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
   .top-row { gap: 8px; }
   .brand { gap: 7px; }
   .brand svg { width: 30px; height: 30px; }
+  .brand-logo { height: 38px; }
   .brand-name { font-size: 21px; }
   .tabs a { padding: 6px 8px; font-size: 13.5px; }
 }

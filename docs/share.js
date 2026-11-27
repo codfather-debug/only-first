@@ -59,12 +59,12 @@
   }
 
   /** opts: {game, team, first, photo, logo, color, alt, ink, url, dateText, seasonText?} */
-  async function render(o) {
+  async function draw(o) {
     await document.fonts.ready;
     const c = document.createElement("canvas"); c.width = W; c.height = H;
     const ctx = c.getContext("2d");
     const D = '"Barlow Condensed", "Arial Narrow", sans-serif', B = 'Barlow, Arial, sans-serif';
-    const [photo, logo, map] = await Promise.all([loadImg(o.photo), loadImg(o.logo),
+    const [photo, logo, wordmark, map] = await Promise.all([loadImg(o.photo), loadImg(o.logo), loadImg(o.brandLogo || "logo.png"),
       svgImage(window.OFMaps.standalone(o.game.league, o.first, o.color, 620))]);
 
     // Team-color field
@@ -77,17 +77,32 @@
     if (logo) { ctx.globalAlpha = 0.16; ctx.drawImage(logo, W - 620, -60, 700, 700); ctx.globalAlpha = 1; }
 
     // Header: brand + game
-    brand(ctx, 64, 60, 76);
-    ctx.fillStyle = o.ink; ctx.textBaseline = "middle";
-    ctx.font = `700 56px ${D}`; ctx.fillText("Only First", 160, 100);
+    if (wordmark) {
+      const lh = 112, lw = lh * (wordmark.width / wordmark.height);
+      ctx.drawImage(wordmark, 52, 34, lw, lh);
+      ctx.fillStyle = o.ink; ctx.textBaseline = "middle";
+    } else {  // logo file missing: the old mark
+      brand(ctx, 64, 60, 76);
+      ctx.fillStyle = o.ink; ctx.textBaseline = "middle";
+      ctx.font = `700 56px ${D}`; ctx.fillText("Only First", 160, 100);
+    }
     ctx.textAlign = "right"; ctx.font = `600 34px ${B}`; ctx.globalAlpha = 0.9;
     ctx.fillText(`${o.leagueName || LNAME[o.game.league]}  ${o.game.name}`, W - 64, 84);
     ctx.font = `500 28px ${B}`; ctx.fillText(o.dateText, W - 64, 124);
     ctx.globalAlpha = 1; ctx.textAlign = "left";
 
+    // Season count, as a pill above the kicker, clear of the headshot (which starts at y=266)
+    if (o.seasonText) {
+      let fs = 32;
+      do { ctx.font = `600 ${fs}px ${B}`; fs -= 2; } while (ctx.measureText(o.seasonText).width > W - 128 - 48 && fs > 22);
+      const tw = ctx.measureText(o.seasonText).width, ph = fs + 26, py = 160;
+      ctx.fillStyle = "rgba(18,21,28,.72)"; roundRect(ctx, 64, py, tw + 48, ph, ph / 2); ctx.fill();
+      ctx.fillStyle = "#ffffff"; ctx.textBaseline = "middle"; ctx.fillText(o.seasonText, 88, py + ph / 2 + 1);
+    }
+
     // Kicker + name
     ctx.textBaseline = "alphabetic";
-    ctx.font = `600 40px ${B}`; ctx.fillText(o.kicker || `${WHAT[o.game.league]}: ${o.team.name}`, 64, 250);
+    ctx.font = `600 40px ${B}`; ctx.fillText(o.kicker || `${WHAT[o.game.league]}: ${o.team.name}`, 64, o.seasonText ? 262 : 250);
     const name = o.first.scorer.toUpperCase();
     const size = fitText(ctx, name, W - 128, 150, 700, D);
 
@@ -101,16 +116,6 @@
     ctx.shadowColor = o.ink === "#ffffff" ? "rgba(0,0,0,.55)" : "rgba(255,255,255,.5)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 4;
     ctx.fillStyle = o.ink; ctx.font = `700 ${size}px ${D}`; ctx.fillText(name, 64, 250 + size * 0.98);
     ctx.restore();
-
-    // Season count, as a pill under the name: "3rd time this season scoring the game's first touchdown"
-    if (o.seasonText) {
-      let fs = 38;
-      do { ctx.font = `600 ${fs}px ${B}`; fs -= 2; } while (ctx.measureText(o.seasonText).width > W - 128 - 56 && fs > 24);
-      const tw = ctx.measureText(o.seasonText).width, ph = fs + 34, py = 250 + size * 0.98 + 36;
-      ctx.fillStyle = "rgba(18,21,28,.78)"; roundRect(ctx, 64, py, tw + 56, ph, ph / 2); ctx.fill();
-      ctx.fillStyle = "#ffffff"; ctx.textBaseline = "middle"; ctx.fillText(o.seasonText, 92, py + ph / 2 + 1);
-      ctx.textBaseline = "alphabetic";
-    }
 
     // Jersey-trim stripe + white panel
     const panelY = 840;
@@ -140,24 +145,27 @@
     ctx.fillStyle = "#7d8492"; ctx.font = `500 30px ${B}`;
     ctx.fillText(o.url.replace(/^https?:\/\//, "").replace(/\/$/, ""), 64, H - 56);
 
+    return c;
+  }
+
+  async function render(o) {
+    const c = await draw(o);
     return new Promise((res) => c.toBlob(res, "image/png"));
   }
 
   async function share(o) {
     const blob = await render(o);
     const file = new File([blob], `only-first-${o.game.league}-${o.game.id}.png`, { type: "image/png" });
-    const text = `${o.kicker ? o.kicker.split(":")[0] : WHAT[o.game.league]}: ${o.first.scorer} (${o.first.team}), ${o.howText || o.first.how}. ${o.game.name}`;
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: "Only First", text: `${text} ${o.link}` }); return "shared"; }
+      try { await navigator.share({ files: [file] }); return "shared"; }  // just the image, no text or link
       catch (e) { if (e.name === "AbortError") return "cancelled"; }
     }
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob); a.download = file.name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-    try { await navigator.clipboard.writeText(o.link); } catch { /* not allowed; the download still worked */ }
     return "downloaded";
   }
 
-  window.OFShare = { render, share };
+  window.OFShare = { draw, render, share };
 })();

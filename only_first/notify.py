@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import os
 import time
+import uuid
 import urllib.error
 import urllib.request
 
@@ -57,16 +58,45 @@ def _ntfy(server: str, topic: str, fs: FirstScore, click: str | None, note: str 
             time.sleep(wait)
 
 
-def _webhook(url: str, fs: FirstScore, note: str | None = None) -> None:
+def _is_discord(url: str) -> bool:
+    return "discord.com/api/webhooks/" in url or "discordapp.com/api/webhooks/" in url
+
+
+def multipart(fields: dict[str, str], files: dict[str, tuple[str, bytes, str]]) -> tuple[bytes, str]:
+    """(body, content type) for a multipart/form-data POST. files: name -> (filename, data, type)."""
+    boundary = uuid.uuid4().hex
+    out = b""
+    for name, value in fields.items():
+        out += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n"
+                f"Content-Type: application/json\r\n\r\n{value}\r\n").encode()
+    for name, (filename, data, ctype) in files.items():
+        out += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"; filename=\"{filename}\"\r\n"
+                f"Content-Type: {ctype}\r\n\r\n").encode() + data + b"\r\n"
+    return out + f"--{boundary}--\r\n".encode(), f"multipart/form-data; boundary={boundary}"
+
+
+def _webhook(url: str, fs: FirstScore, note: str | None = None, image=None) -> None:
+    """image: a function returning the share image's PNG bytes (or None), called only for Discord."""
     text = f"{EMOJI.get(fs.league, '')} **Only First:** {fs.headline()}\n{_body(fs, note)}"
-    req = urllib.request.Request(url, data=json.dumps({"content": text, "text": text}).encode(),
-                                 headers={"Content-Type": "application/json",
-                                          "User-Agent": "only-first/0.2"}, method="POST")
-    urllib.request.urlopen(req, timeout=15).close()
+    headers = {"User-Agent": "only-first/0.3"}
+    png = None
+    if image and _is_discord(url):
+        try:
+            png = image()
+        except Exception as e:  # no image is better than no alert
+            print(f"   [warn] share image failed: {e}", flush=True)
+    if png:
+        body, ctype = multipart({"payload_json": json.dumps({"content": text, "allowed_mentions": {"parse": []}})},
+                                {"files[0]": (f"only-first-{fs.league}-{fs.game_id}.png", png, "image/png")})
+    else:
+        body, ctype = json.dumps({"content": text, "text": text}).encode(), "application/json"
+    req = urllib.request.Request(url, data=body, headers={**headers, "Content-Type": ctype}, method="POST")
+    urllib.request.urlopen(req, timeout=30).close()
 
 
 def send(fs: FirstScore, teams: list[str], prefix: str | None, site_url: str | None = None,
-         note: str | None = None) -> None:
+         note: str | None = None, image=None) -> None:
+    """Phone alerts go first; the webhook, which may wait a few seconds for the image, goes last."""
     console(fs, note)
     server = os.environ.get("ONLY_FIRST_NTFY_SERVER", "https://ntfy.sh")
     hook = os.environ.get("ONLY_FIRST_WEBHOOK_URL")
@@ -75,7 +105,7 @@ def send(fs: FirstScore, teams: list[str], prefix: str | None, site_url: str | N
         jobs += [(f"ntfy:{t}", lambda t=t: _ntfy(server, t, fs, site_url, note))
                  for t in topics(prefix, fs.league, teams)]
     if hook:
-        jobs.append(("webhook", lambda: _webhook(hook, fs, note)))
+        jobs.append(("webhook", lambda: _webhook(hook, fs, note, image)))
     for name, fn in jobs:
         try:
             fn()
