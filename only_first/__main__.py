@@ -75,6 +75,36 @@ def save_store(store: dict) -> None:
     FIRSTS.write_text(json.dumps(store, ensure_ascii=False, separators=(",", ":")) + "\n")
 
 
+WHAT = {"nba": "points", "nhl": "goal", "nfl": "TD"}
+
+
+def season_of(day: str) -> int:
+    """The year a season starts in. All three leagues start in Aug-Oct, so Jan-Jul belongs to the year before."""
+    return int(day[:4]) if int(day[4:6]) >= 8 else int(day[:4]) - 1
+
+
+def ordinal(n: int) -> str:
+    return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
+
+
+def season_count(store: dict, league: str, day: str, first: dict) -> int:
+    """How many of this season's games, this one included, the scorer of `first` scored first in."""
+    season = season_of(day)
+    pid = first.get("scorer_id")
+    def same(f: dict) -> bool:
+        if pid and f.get("scorer_id"):
+            return f["scorer_id"] == pid
+        return (f.get("scorer"), f.get("team")) == (first.get("scorer"), first.get("team"))
+    return sum(1 for g in store["games"].values()
+               if g.get("league") == league and g.get("first") and season_of(g["date"]) == season and same(g["first"]))
+
+
+def season_note(store: dict, league: str, day: str, first: dict) -> str:
+    n = season_count(store, league, day, first)
+    times = "First time" if n == 1 else f"{ordinal(n)} time"
+    return f"{times} this season scoring the game's first {WHAT[league]}"
+
+
 def process_date(store: dict, league: str, day: str, alert: bool) -> int:
     """Refresh one league/date in the store. Returns number of new first scores."""
     new = 0
@@ -102,10 +132,11 @@ def process_date(store: dict, league: str, day: str, alert: bool) -> int:
         if fs:
             rec["first"] = fs.to_dict()
             new += 1
+            note = season_note(store, league, day, rec["first"])
             if alert:
-                notify.send(fs, [g["home"], g["away"]], prefix, site)
+                notify.send(fs, [g["home"], g["away"]], prefix, site, note)
             else:
-                notify.console(fs)
+                notify.console(fs, note)
     return new
 
 

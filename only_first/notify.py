@@ -30,14 +30,18 @@ def topics(prefix: str, league: str, teams: list[str]) -> list[str]:
     return [f"{prefix}-{league}"] + [f"{prefix}-{league}-{t.lower()}" for t in teams]
 
 
-def console(fs: FirstScore) -> None:
-    body = fs.message().replace("\n", "\n   ")
+def _body(fs: FirstScore, note: str | None) -> str:
+    return fs.message() + (f"\n{note}" if note else "")
+
+
+def console(fs: FirstScore, note: str | None = None) -> None:
+    body = _body(fs, note).replace("\n", "\n   ")
     print(f"\n{EMOJI.get(fs.league, '')} ONLY FIRST  {fs.headline()}\n   {body}", flush=True)
 
 
-def _ntfy(server: str, topic: str, fs: FirstScore, click: str | None) -> None:
+def _ntfy(server: str, topic: str, fs: FirstScore, click: str | None, note: str | None = None) -> None:
     payload = {"topic": topic, "title": f"Only First: {fs.headline()}",
-               "message": fs.message(), "tags": [NTFY_TAGS[fs.league]]}
+               "message": _body(fs, note), "tags": [NTFY_TAGS[fs.league]]}
     if click:
         payload["click"] = click
     req = urllib.request.Request(server.rstrip("/"), data=json.dumps(payload).encode(),
@@ -53,24 +57,25 @@ def _ntfy(server: str, topic: str, fs: FirstScore, click: str | None) -> None:
             time.sleep(wait)
 
 
-def _webhook(url: str, fs: FirstScore) -> None:
-    text = f"{EMOJI.get(fs.league, '')} **Only First:** {fs.headline()}\n{fs.message()}"
+def _webhook(url: str, fs: FirstScore, note: str | None = None) -> None:
+    text = f"{EMOJI.get(fs.league, '')} **Only First:** {fs.headline()}\n{_body(fs, note)}"
     req = urllib.request.Request(url, data=json.dumps({"content": text, "text": text}).encode(),
                                  headers={"Content-Type": "application/json",
                                           "User-Agent": "only-first/0.2"}, method="POST")
     urllib.request.urlopen(req, timeout=15).close()
 
 
-def send(fs: FirstScore, teams: list[str], prefix: str | None, site_url: str | None = None) -> None:
-    console(fs)
+def send(fs: FirstScore, teams: list[str], prefix: str | None, site_url: str | None = None,
+         note: str | None = None) -> None:
+    console(fs, note)
     server = os.environ.get("ONLY_FIRST_NTFY_SERVER", "https://ntfy.sh")
     hook = os.environ.get("ONLY_FIRST_WEBHOOK_URL")
     jobs = []
     if prefix:
-        jobs += [(f"ntfy:{t}", lambda t=t: _ntfy(server, t, fs, site_url))
+        jobs += [(f"ntfy:{t}", lambda t=t: _ntfy(server, t, fs, site_url, note))
                  for t in topics(prefix, fs.league, teams)]
     if hook:
-        jobs.append(("webhook", lambda: _webhook(hook, fs)))
+        jobs.append(("webhook", lambda: _webhook(hook, fs, note)))
     for name, fn in jobs:
         try:
             fn()

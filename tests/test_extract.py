@@ -70,3 +70,30 @@ class TestFirsts(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSeasonCount(unittest.TestCase):
+    def setUp(self):
+        from only_first import __main__ as m
+        self.m = m
+        f = lambda pid, name="X", team="DET": {"scorer_id": pid, "scorer": name, "team": team}
+        self.store = {"games": {
+            "a": {"league": "nfl", "date": "20260913", "first": f("1")},
+            "b": {"league": "nfl", "date": "20261101", "first": f("1", team="CHI")},  # traded: same id counts
+            "c": {"league": "nfl", "date": "20270105", "first": f("1")},             # January: same season
+            "d": {"league": "nfl", "date": "20250914", "first": f("1")},             # last season
+            "e": {"league": "nba", "date": "20261101", "first": f("1")},             # other league
+            "f": {"league": "nfl", "date": "20261101", "first": f("2")},
+            "g": {"league": "nfl", "date": "20261108", "first": None},
+        }}
+
+    def test_counts_this_season_by_player_id(self):
+        self.assertEqual(self.m.season_count(self.store, "nfl", "20270105", {"scorer_id": "1"}), 3)
+
+    def test_note_wording(self):
+        self.assertEqual(self.m.season_note(self.store, "nfl", "20261101", {"scorer_id": "2"}),
+                         "First time this season scoring the game's first TD")
+        self.assertEqual(self.m.season_note(self.store, "nfl", "20261101", {"scorer_id": "1"}),
+                         "3rd time this season scoring the game's first TD")
+        self.assertEqual([self.m.ordinal(n) for n in (1, 2, 3, 4, 11, 12, 13, 21, 22, 111)],
+                         ["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "111th"])
