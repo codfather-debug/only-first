@@ -325,7 +325,7 @@
     // home.* strings contain trusted <b> markup from i18n.js, never data.
     const how = isIOS() ? t("home.ios")
       : state.installPrompt ? `<button class="btn" data-install>${esc(t("home.install"))}</button>` : t("home.other");
-    return `<div class="panel home-tip">${window.OFBrand.mark(56)}
+    return `<div class="panel home-tip"><img src="icons/icon-192.png" width="56" height="56" alt="">
       <div><h2>${esc(t("home.title"))}</h2><p style="margin:0;color:var(--text-2)">${esc(t("home.body"))} ${how}</p></div></div>`;
   }
 
