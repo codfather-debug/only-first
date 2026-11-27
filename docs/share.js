@@ -58,7 +58,7 @@
     }));
   }
 
-  /** opts: {game, team, first, photo, logo, color, alt, ink, url, dateText} */
+  /** opts: {game, team, first, photo, logo, color, alt, ink, url, dateText, seasonText?} */
   async function render(o) {
     await document.fonts.ready;
     const c = document.createElement("canvas"); c.width = W; c.height = H;
@@ -101,6 +101,16 @@
     ctx.shadowColor = o.ink === "#ffffff" ? "rgba(0,0,0,.55)" : "rgba(255,255,255,.5)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 4;
     ctx.fillStyle = o.ink; ctx.font = `700 ${size}px ${D}`; ctx.fillText(name, 64, 250 + size * 0.98);
     ctx.restore();
+
+    // Season count, as a pill under the name: "3rd time this season scoring the game's first touchdown"
+    if (o.seasonText) {
+      let fs = 38;
+      do { ctx.font = `600 ${fs}px ${B}`; fs -= 2; } while (ctx.measureText(o.seasonText).width > W - 128 - 56 && fs > 24);
+      const tw = ctx.measureText(o.seasonText).width, ph = fs + 34, py = 250 + size * 0.98 + 36;
+      ctx.fillStyle = "rgba(18,21,28,.78)"; roundRect(ctx, 64, py, tw + 56, ph, ph / 2); ctx.fill();
+      ctx.fillStyle = "#ffffff"; ctx.textBaseline = "middle"; ctx.fillText(o.seasonText, 92, py + ph / 2 + 1);
+      ctx.textBaseline = "alphabetic";
+    }
 
     // Jersey-trim stripe + white panel
     const panelY = 840;

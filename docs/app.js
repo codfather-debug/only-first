@@ -650,6 +650,7 @@
         kicker: t(`share.kicker.${g.league}`, { team: tm.name }),
         assistText: g.first.assists?.length ? t(g.league === "nhl" && g.first.assists.length > 1 ? "card.assist.nhl" : "card.assist", { names: g.first.assists.join(", ") }) : "",
         leagueName: lname(g.league),
+        seasonText: g.nth ? t(`card.season.${g.league}`, { nth: ordinal(g.nth) }) : "",
         photo: headshot(g.league, g.first.scorer_id, 700, 510), logo: tm.logo,
         color: hex(tm.color), alt: hex(tm.alt), ink: inkOn(tm.color),
         url: siteUrl(), link: `${siteUrl()}#game=${g.league}-${g.id}`,
