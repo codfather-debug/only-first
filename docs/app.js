@@ -147,10 +147,31 @@
         const d = await getJSON(u);
         state.updated = d.updated;
         state.games = Object.values(d.games).sort((a, b) => (b.start || "").localeCompare(a.start || ""));
+        countSeasons(state.games);
         return;
       } catch (e) { lastErr = e; }
     }
     throw lastErr;
+  }
+
+  // Season runs Aug-Jul for all three leagues. g.nth: how many of the season's games, up to and
+  // including this one, its scorer scored first in (the same count the alerts give).
+  const seasonOf = (day) => (+day.slice(4, 6) >= 8 ? +day.slice(0, 4) : +day.slice(0, 4) - 1);
+  function countSeasons(games) {
+    const seen = new Map();
+    for (const g of [...games].reverse()) {  // oldest first
+      if (!g.first || !g.date) continue;
+      const who = g.first.scorer_id || `${g.first.scorer}|${g.first.team}`;
+      const k = `${g.league}|${seasonOf(g.date)}|${who}`;
+      g.nth = (seen.get(k) || 0) + 1;
+      seen.set(k, g.nth);
+    }
+  }
+  function ordinal(n) {
+    const lang = window.OFi18n.lang;
+    if (lang === "es") return `${n}.ª`;
+    if (lang === "fr") return n === 1 ? "1re" : `${n}e`;
+    return n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : { 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th");
   }
 
   function filtered() {
@@ -209,6 +230,7 @@
       const map = svg ? `<figure class="mapfig">${svg}<figcaption>${esc(mapCaption(g.league, f))}</figcaption></figure>` : "";
       const assistKey = g.league === "nhl" && f.assists.length > 1 ? "card.assist.nhl" : "card.assist";
       const assists = f.assists?.length ? `<p class="assist">${esc(t(assistKey, { names: f.assists.join(", ") }))}</p>` : "";
+      const season = g.nth ? `<p class="season">${esc(t(`card.season.${g.league}`, { nth: ordinal(g.nth) }))}</p>` : "";
       return `<article class="card${isNew ? " is-new" : ""}" id="g-${g.league}-${esc(g.id)}" style="${teamVars(tm)}">
         <div class="hero">
           ${tm.logo ? `<img class="wm" src="${esc(tm.logo)}" alt="" loading="lazy">` : ""}
@@ -216,7 +238,7 @@
             <span class="when">${esc(periodLabel(g.league, f.period))} ${esc(f.clock)}</span></div>
           <div class="who">${img}<h3><small>${esc(tm.name)}</small>${esc(f.scorer)}</h3></div>
         </div>
-        <div class="body"><div><p class="how">${esc(howText(g.league, f.how))}</p>${assists}${facts(g)}</div>${map}</div>
+        <div class="body"><div><p class="how">${esc(howText(g.league, f.how))}</p>${assists}${season}${facts(g)}</div>${map}</div>
         <div class="card-actions">
           <details class="play-text"><summary>${esc(t("card.playbyplay"))}</summary><p lang="en">${esc(f.description)}</p></details>
           <button class="share" data-share="${g.league}:${esc(g.id)}" aria-label="${esc(t("card.shareLabel", { name: f.scorer }))}">
