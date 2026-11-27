@@ -5,14 +5,13 @@
   const { t } = window.OFi18n;
   const ALL_LEAGUES = ["nba", "nhl", "nfl"];
   const EMOJI = { nba: "🏀", nhl: "🏒", nfl: "🏈" };
-  const DAYS_PER_PAGE = 4;
   const REFRESH_MS = 60_000;
   const LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
 
   const state = {
     config: {}, teams: {}, teamIdx: {}, games: [], updated: null,
     view: "latest", league: "all", mineOnly: false, mine: new Set(),
-    daysShown: DAYS_PER_PAGE, seen: new Set(), firstLoad: true, mapTeam: {}, statsLeague: "nba", introDone: false,
+    day: "", seen: new Set(), firstLoad: true, mapTeam: {}, statsLeague: "nba", introDone: false,
     sports: new Set(ALL_LEAGUES), theme: "auto",
   };
 
@@ -51,6 +50,8 @@
     if (c1.toLowerCase() === c2.toLowerCase()) c2 = luminance(c1) > 0.4 ? "#12151c" : "#ffffff";
     return `--c1:${c1};--c2:${c2};--on:${inkOn(c1)};--tc:${c1}`;
   }
+
+  const localYmd = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
 
   function dayLabel(s) {
     const d = ymd(s);
@@ -278,7 +279,17 @@
     const intro = state.introDone ? "" : `<div class="intro">
         <p><b>${esc(t("intro.title"))}</b> ${esc(t("intro.body"))}</p>
         <div class="intro-actions"><a class="btn" href="#teams">${esc(t("intro.pick"))}</a><button class="btn ghost" data-dismiss-intro>${esc(t("intro.ok"))}</button></div></div>`;
-    const html = days.slice(0, state.daysShown).map((d, i) => {
+    // One day at a time: Today, Yesterday, or a picked date ("" means today).
+    const today = localYmd(new Date()), yesterday = localYmd(new Date(Date.now() - 86400000));
+    const day = state.day || today;
+    const iso = (x) => `${x.slice(0, 4)}-${x.slice(4, 6)}-${x.slice(6, 8)}`;
+    const picked = day !== today && day !== yesterday;
+    const bar = `<div class="chips day-tabs" role="group" aria-label="${esc(t("day.choose"))}">
+        <button data-day="${today}" aria-pressed="${day === today}">${esc(t("day.today"))}</button>
+        <button data-day="${yesterday}" aria-pressed="${day === yesterday}">${esc(t("day.yesterday"))}</button>
+        <label class="date-chip${picked ? " on" : ""}"><input type="date" id="day-pick" aria-label="${esc(t("day.pick"))}" value="${iso(day)}" min="${iso(days[days.length - 1])}" max="${iso(days[0] > today ? days[0] : today)}"></label>
+      </div>`;
+    const html = (byDay.has(day) ? [day] : []).map((d, i) => {
       const list = byDay.get(d).sort((a, b) => order[a.state] - order[b.state] ||
         (a.state === "pre" ? (a.start || "").localeCompare(b.start || "") : (b.start || "").localeCompare(a.start || "")));
       const [big, small] = dayLabel(d);
@@ -288,9 +299,14 @@
           <span class="tally">${esc(t("day.tally", { n, total: list.length }))}</span>${fresh}</div>
         <div class="grid">${list.map(card).join("")}</div>`;
     }).join("");
-    const more = days.length > state.daysShown ? `<button class="more" id="more">${esc(t("more"))}</button>` : "";
-    el.innerHTML = intro + html + more;
-    $("#more")?.addEventListener("click", () => { state.daysShown += DAYS_PER_PAGE; renderLatest(); });
+    const none = byDay.has(day) ? "" : `<p class="empty">${esc(t("empty.day"))}</p>`;
+    el.innerHTML = intro + bar + html + none;
+    el.querySelectorAll("[data-day]").forEach((b) => b.addEventListener("click", () => { state.day = b.dataset.day === today ? "" : b.dataset.day; renderLatest(); }));
+    $("#day-pick")?.addEventListener("change", (e) => {
+      if (!e.target.value) return;
+      const v = e.target.value.replaceAll("-", "");
+      state.day = v === today ? "" : v; renderLatest();
+    });
   }
 
   function freshness() {
@@ -577,7 +593,7 @@
     document.querySelector(".chips").addEventListener("click", (e) => {
       const b = e.target.closest("button[data-league]"); if (!b) return;
       if (state.view === "stats" && b.dataset.league !== "all") { state.statsLeague = b.dataset.league; store.set("statsLeague", state.statsLeague); }
-      state.league = b.dataset.league; store.set("league", state.league); state.daysShown = DAYS_PER_PAGE; render();
+      state.league = b.dataset.league; store.set("league", state.league); render();
     });
     $("#mine-only").addEventListener("click", () => {
       state.mineOnly = !state.mineOnly; store.set("mineOnly", state.mineOnly);
@@ -688,8 +704,7 @@
     if (!g) return;
     if (!state.sports.has(lg)) { state.sports.add(lg); store.set("sports", [...state.sports]); }
     state.league = "all"; state.mineOnly = false;
-    const days = [...new Set(state.games.map((x) => x.date))].sort().reverse();
-    state.daysShown = Math.max(state.daysShown, days.indexOf(g.date) + 1);
+    state.day = g.date === localYmd(new Date()) ? "" : g.date;
     state.view = "latest"; render();
     const el = document.getElementById(`g-${lg}-${id}`);
     if (el) { el.scrollIntoView({ block: "center" }); el.classList.add("is-new"); }
