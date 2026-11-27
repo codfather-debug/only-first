@@ -6,6 +6,14 @@
 
   const EN = {
     "tab.latest": "Latest", "tab.teams": "My teams", "tab.stats": "Stats",
+    "tab.matchup": "Matchup",
+    "mu.pickTeams": "Pick a matchup", "mu.swap": "Swap home and away", "mu.allGames": "All games",
+    "mu.split": "{away} away · {home} home", "mu.splitHelp": "Only {away}'s road games and {home}'s home games.",
+    "mu.rate": "Scored first", "mu.after": "Record after scoring first", "mu.tips": "Opening tips won",
+    "mu.scorers": "Their first scorers", "mu.none": "None yet.", "mu.recent": "Last 5 games",
+    "mu.h2h": "Head to head this season", "mu.noH2h": "They haven't met yet this season.",
+    "mu.lean": "Who scores first?", "mu.leanNote": "The average of how often each team scores first and how often the other lets its opponent score first. A rough guide, not a prediction.",
+    "mu.noGames": "No tracked games yet.", "mu.same": "Pick two different teams.", "mu.open": "Matchup",
     "filter.all": "All", "filter.mine": "★ My teams", "install": "Install app", "settings": "Settings",
     "foot.what": "NBA tracks the first points, NHL the first goal, NFL the first touchdown. Data comes from ESPN's public feeds and is checked every few minutes.",
     "day.choose": "Choose a day", "day.pick": "Pick a date", "empty.day": "No games tracked on this day.",
@@ -89,6 +97,14 @@
 
   const ES = {
     "tab.latest": "Lo último", "tab.teams": "Mis equipos", "tab.stats": "Datos",
+    "tab.matchup": "Duelo",
+    "mu.pickTeams": "Elegir un duelo", "mu.swap": "Intercambiar local y visitante", "mu.allGames": "Todos los partidos",
+    "mu.split": "{away} de visitante · {home} de local", "mu.splitHelp": "Solo los partidos de {away} como visitante y de {home} como local.",
+    "mu.rate": "Anotó primero", "mu.after": "Récord tras anotar primero", "mu.tips": "Saltos iniciales ganados",
+    "mu.scorers": "Sus primeros anotadores", "mu.none": "Ninguno todavía.", "mu.recent": "Últimos 5 partidos",
+    "mu.h2h": "Enfrentamientos esta temporada", "mu.noH2h": "Aún no se han enfrentado esta temporada.",
+    "mu.lean": "¿Quién anota primero?", "mu.leanNote": "El promedio de cuántas veces cada equipo anota primero y cuántas veces el otro deja que su rival anote primero. Una guía aproximada, no un pronóstico.",
+    "mu.noGames": "Aún no hay partidos registrados.", "mu.same": "Elige dos equipos distintos.", "mu.open": "Duelo",
     "filter.all": "Todos", "filter.mine": "★ Mis equipos", "install": "Instalar app", "settings": "Ajustes",
     "foot.what": "En la NBA seguimos los primeros puntos, en la NHL el primer gol y en la NFL el primer touchdown. Los datos vienen de los feeds públicos de ESPN y se revisan cada pocos minutos.",
     "day.choose": "Elegir un día", "day.pick": "Elegir una fecha", "empty.day": "No hay partidos registrados este día.",
@@ -171,6 +187,14 @@
 
   const FR = {
     "tab.latest": "Récents", "tab.teams": "Mes équipes", "tab.stats": "Stats",
+    "tab.matchup": "Duel",
+    "mu.pickTeams": "Choisir un duel", "mu.swap": "Inverser domicile et visiteur", "mu.allGames": "Tous les matchs",
+    "mu.split": "{away} à l'étranger · {home} à domicile", "mu.splitHelp": "Seulement les matchs de {away} à l'étranger et de {home} à domicile.",
+    "mu.rate": "A marqué en premier", "mu.after": "Fiche après avoir marqué en premier", "mu.tips": "Entre-deux d'ouverture gagnés",
+    "mu.scorers": "Leurs premiers marqueurs", "mu.none": "Aucun pour l'instant.", "mu.recent": "5 derniers matchs",
+    "mu.h2h": "Face-à-face cette saison", "mu.noH2h": "Ils ne se sont pas encore affrontés cette saison.",
+    "mu.lean": "Qui marque en premier ?", "mu.leanNote": "La moyenne de la fréquence à laquelle chaque équipe marque en premier et à laquelle l'autre laisse son adversaire marquer en premier. Un repère approximatif, pas une prédiction.",
+    "mu.noGames": "Aucun match suivi pour l'instant.", "mu.same": "Choisissez deux équipes différentes.", "mu.open": "Duel",
     "filter.all": "Tous", "filter.mine": "★ Mes équipes", "install": "Installer l'app", "settings": "Réglages",
     "foot.what": "NBA : premiers points. LNH : premier but. NFL : premier touché. Données tirées des flux publics d'ESPN, vérifiées aux quelques minutes.",
     "day.choose": "Choisir un jour", "day.pick": "Choisir une date", "empty.day": "Aucun match suivi ce jour-là.",

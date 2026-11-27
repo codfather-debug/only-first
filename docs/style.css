@@ -364,3 +364,51 @@ tr.pick.sel td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
   .tabs a { padding: 6px 8px; font-size: 13.5px; }
 }
 @media (max-width: 350px) { .brand-name { display: none; } }
+
+/* ---------------------------------------------------------------- matchup */
+.mu-slate { display: flex; align-items: center; gap: 10px; margin: 4px 0 6px; }
+.mu-slate .lbl { font-weight: 700; color: var(--text-2); flex: none; }
+.mu-slate .chips { flex: 1; min-width: 0; }
+.mu-pick { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: end; margin-bottom: 12px; }
+.mu-pick label { display: grid; gap: 4px; font-size: 14px; color: var(--text-2); font-weight: 600; min-width: 0; }
+.mu-pick select { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px; font-size: 15px; min-height: 40px; width: 100%; }
+.mu-swap { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; width: 44px; height: 40px; font-size: 18px; cursor: pointer; color: var(--text-2); }
+.mu-swap:hover { color: var(--text); }
+.mu-seg { max-width: 560px; }
+.mu-seg button { line-height: 1.2; }
+.mu-seg + .map-note { margin: 8px 0 0; }
+.mu-cols .panel { margin: 0; }
+.mu-side { border-top: 5px solid var(--c1); }
+.mu-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.mu-head img { width: 52px; height: 52px; object-fit: contain; }
+.mu-head small { color: var(--text-3); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; font-size: 12px; }
+.mu-head h2 { margin: 0; font: 700 28px/1.05 var(--display); }
+.mu-side .tiles { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.mu-side .tile { background: var(--surface-2); border: 0; }
+.mu-recent { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.mu-recent a { display: grid; grid-template-columns: 58px auto 1fr auto; gap: 10px; align-items: center; padding: 7px 8px; border-radius: 8px; color: inherit; text-decoration: none; font-size: 15px; }
+.mu-recent a:hover { background: var(--surface-2); }
+.mu-recent .d { color: var(--text-3); font-size: 14px; }
+.mu-recent .by { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mu-recent img { width: 18px; height: 18px; object-fit: contain; flex: none; }
+.mu-recent .mark { color: var(--text-3); font-size: 14px; white-space: nowrap; }
+.mu-recent li.yes .mark { color: var(--good); font-weight: 700; }
+.mu-lean { display: flex; height: 44px; border-radius: 12px; overflow: hidden; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mu-lean span { display: flex; align-items: center; gap: 6px; padding: 0 12px; min-width: max-content; white-space: nowrap; }
+.mu-lean .a { background: var(--ca); color: #fff; }
+.mu-lean .h { background: var(--ch); color: #fff; justify-content: flex-end; }
+.mu-lean img { width: 24px; height: 24px; object-fit: contain; background: rgba(255,255,255,.85); border-radius: 50%; padding: 2px; }
+.mu-lean + .map-note { margin: 8px 0 0; }
+@media (max-width: 560px) {
+  .mu-slate { flex-direction: column; align-items: stretch; gap: 6px; }
+  .mu-seg button { font-size: 14px; }
+  .mu-recent a { grid-template-columns: 48px auto 1fr auto; gap: 8px; }
+}
+a.share { text-decoration: none; }
+
+/* four tabs: on phones they get their own full-width row under the logo */
+@media (max-width: 600px) {
+  .top-row { flex-wrap: wrap; row-gap: 8px; }
+  .tabs { flex: 1 1 100%; }
+  .tabs a { flex: 1; justify-content: center; text-align: center; padding: 6px 4px; }
+}

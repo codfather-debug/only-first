@@ -6,12 +6,13 @@
   const ALL_LEAGUES = ["nba", "nhl", "nfl"];
   const EMOJI = { nba: "🏀", nhl: "🏒", nfl: "🏈" };
   const REFRESH_MS = 60_000;
+  const VIEWS = ["latest", "teams", "matchup", "stats"];
   const LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
 
   const state = {
     config: {}, teams: {}, teamIdx: {}, games: [], updated: null,
     view: "latest", league: "all", mineOnly: false, mine: new Set(),
-    day: "", seen: new Set(), firstLoad: true, mapTeam: {}, statsLeague: "nba", introDone: false,
+    day: "", seen: new Set(), firstLoad: true, mapTeam: {}, matchup: {}, muSplit: false, statsLeague: "nba", introDone: false,
     sports: new Set(ALL_LEAGUES), theme: "auto",
   };
 
@@ -260,6 +261,7 @@
         <div class="vs">${away.logo ? `<img src="${esc(away.logo)}" alt="${esc(away.name)}">` : ""}<span>${esc(t("vs.at"))}</span>${home.logo ? `<img src="${esc(home.logo)}" alt="${esc(home.name)}">` : ""}</div>
       </div>
       <div class="body"><div><p class="waiting">${esc(msg)}</p>${facts(g)}</div></div>
+      <div class="card-actions"><span></span><a class="share" href="#matchup=${g.league}-${esc(g.away)}-${esc(g.home)}">${esc(t("mu.open"))} →</a></div>
     </article>`;
   }
 
@@ -484,6 +486,118 @@
       </div></div>`;
   }
 
+  // ---------------------------------------------------------------- matchup view
+  // Two teams side by side: how often each scores first, who does it, and how their meetings went.
+  // "split" keeps only the away team's road games and the home team's home games.
+  const playsIn = (g, abbr, side) => (side ? g[side] === abbr : g.home === abbr || g.away === abbr);
+
+  function slate(lg) {
+    // Today's games in this league, or the next day that has some, or failing that the latest day.
+    const today = localYmd(new Date());
+    const lgGames = state.games.filter((g) => g.league === lg);
+    const days = [...new Set(lgGames.map((g) => g.date))].sort();
+    const day = days.find((d) => d >= today) || days[days.length - 1];
+    const order = { in: 0, pre: 1, post: 2 };
+    const list = lgGames.filter((g) => g.date === day)
+      .sort((a, b) => order[a.state] - order[b.state] || (a.start || "").localeCompare(b.start || ""));
+    return { day, list };
+  }
+
+  function matchupFor(lg) {
+    const m = state.matchup[lg];
+    if (m && state.teamIdx[teamKey(lg, m.away)] && state.teamIdx[teamKey(lg, m.home)]) return m;
+    const g = slate(lg).list[0];
+    const tms = state.teams[lg] || [];
+    return g ? { away: g.away, home: g.home } : { away: tms[0]?.abbr, home: tms[1]?.abbr };
+  }
+
+  function sideCard(lg, games, abbr, side, split) {
+    const tm = team(lg, abbr);
+    const played = games.filter((g) => playsIn(g, abbr, split ? side : null));
+    const first = played.filter((g) => g.first.team === abbr);
+    const fFinals = first.filter((g) => winnerOf(g));
+    const fWon = fFinals.filter((g) => winnerOf(g) === abbr).length;
+    const tipped = played.filter((g) => g.tip && g.tip.team);
+    const tipsWon = tipped.filter((g) => g.tip.team === abbr).length;
+    const tile = (k, v, s) => `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="s">${esc(s)}</div></div>`;
+    const scorers = count(first, (g) => `${g.first.scorer}|${g.first.scorer_id || ""}`).slice(0, 6).map(([k, v]) => {
+      const [name, id] = k.split("|");
+      const face = id ? `<img class="pface" src="${esc(headshot(lg, id, 60, 44))}" alt="" loading="lazy">` : "";
+      return `<tr><td>${face}${esc(name)}</td><td class="n">${v}</td><td class="n">${pctLabel(v, first.length)}</td></tr>`;
+    }).join("");
+    const recent = played.slice(0, 5).map((g) => {
+      const home = g.home === abbr, opp = team(lg, home ? g.away : g.home), by = team(lg, g.first.team);
+      const mine = g.first.team === abbr;
+      return `<li class="${mine ? "yes" : "no"}"><a href="#game=${lg}-${esc(g.id)}">
+        <span class="d">${esc(dayStr(g.date))}</span>
+        <span class="tteam">${home ? "vs" : "@"} <img src="${esc(opp.logo)}" alt="">${esc(opp.abbr)}</span>
+        <span class="by"><img src="${esc(by.logo)}" alt="">${esc(g.first.scorer)}</span>
+        <span class="mark" aria-hidden="true">${mine ? "✓" : "✗"}</span></a></li>`;
+    }).join("");
+    return { played: played.length, first: first.length, html: `<div class="panel mu-side" style="${teamVars(tm)}">
+      <div class="mu-head"><img src="${esc(tm.logo)}" alt=""><div><small>${esc(t(`side.${side}`))}</small><h2>${esc(tm.name)}</h2></div></div>
+      ${played.length ? `<div class="tiles">
+        ${tile(t("mu.rate"), `${pct(first.length, played.length)}%`, t("tile.ofGames", { n: first.length, total: played.length }))}
+        ${tile(t("mu.after"), fFinals.length ? `${fWon}–${fFinals.length - fWon}` : "–", t("tile.ofFinished", { n: fFinals.length, total: played.filter((g) => g.final).length }))}
+        ${lg === "nba" && tipped.length ? tile(t("mu.tips"), `${pct(tipsWon, tipped.length)}%`, t("tile.ofGames", { n: tipsWon, total: tipped.length })) : ""}
+      </div>
+      <h3>${esc(t("mu.scorers"))}</h3>
+      ${scorers ? `<table><thead><tr><th>${esc(t("th.player"))}</th><th class="n">${esc(t("th.firsts"))}</th><th class="n"></th></tr></thead><tbody>${scorers}</tbody></table>` : `<p class="empty">${esc(t("mu.none"))}</p>`}
+      <h3 style="margin-top:16px">${esc(t("mu.recent"))}</h3><ul class="mu-recent">${recent}</ul>`
+      : `<p class="empty">${esc(t("mu.noGames"))}</p>`}
+    </div>` };
+  }
+
+  function renderMatchup() {
+    const el = $("#view-matchup");
+    const lg = statsLeague();
+    const games = state.games.filter((g) => g.league === lg && g.first);
+    const { away, home } = matchupFor(lg);
+    const split = state.muSplit;
+    const A = team(lg, away), H = team(lg, home);
+    const { day, list } = slate(lg);
+    const quick = list.length ? `<div class="mu-slate"><span class="lbl">${esc(dayLabel(day)[0])}</span><div class="chips">${list.map((g) =>
+      `<button data-mu="${esc(g.away)}|${esc(g.home)}" aria-pressed="${g.away === away && g.home === home}">${esc(g.away)} @ ${esc(g.home)}</button>`).join("")}</div></div>` : "";
+    const opts = (sel) => (state.teams[lg] || []).map((tm) => `<option value="${esc(tm.abbr)}"${tm.abbr === sel ? " selected" : ""}>${esc(tm.name)}</option>`).join("");
+    const pickers = `<div class="mu-pick">
+        <label><span>${esc(t("side.away"))}</span><select data-muside="away">${opts(away)}</select></label>
+        <button type="button" class="mu-swap" data-muswap aria-label="${esc(t("mu.swap"))}" title="${esc(t("mu.swap"))}">⇄</button>
+        <label><span>${esc(t("side.home"))}</span><select data-muside="home">${opts(home)}</select></label>
+      </div>
+      <div class="seg mu-seg" role="radiogroup" aria-label="${esc(t("homeaway"))}">
+        <button type="button" role="radio" aria-checked="${!split}" data-musplit="0">${esc(t("mu.allGames"))}</button>
+        <button type="button" role="radio" aria-checked="${split}" data-musplit="1">${esc(t("mu.split", { away: A.short, home: H.short }))}</button>
+      </div>
+      ${split ? `<p class="map-note">${esc(t("mu.splitHelp", { away: A.short, home: H.short }))}</p>` : ""}`;
+    if (away === home) {
+      el.innerHTML = `${quick}<div class="panel"><h3>${esc(t("mu.pickTeams"))}</h3>${pickers}<p class="empty">${esc(t("mu.same"))}</p></div>`;
+      return;
+    }
+    const a = sideCard(lg, games, away, "away", split), h = sideCard(lg, games, home, "home", split);
+    let lean = "";
+    if (a.played && h.played) {
+      const ra = a.first / a.played, rh = h.first / h.played;
+      const pa = Math.round(50 * (ra + (1 - rh)));
+      lean = `<div class="panel"><h3>${esc(t("mu.lean"))}</h3>
+        <div class="mu-lean" style="--ca:${hex(A.color)};--ch:${hex(H.color)}">
+          <span class="a" style="width:${pa}%"><img src="${esc(A.logo)}" alt="">${esc(A.abbr)} ${pa}%</span>
+          <span class="h" style="width:${100 - pa}%">${100 - pa}% ${esc(H.abbr)}<img src="${esc(H.logo)}" alt=""></span>
+        </div><p class="map-note">${esc(t("mu.leanNote"))}</p></div>`;
+    }
+    const met = games.filter((g) => playsIn(g, away) && playsIn(g, home) && (!split || (g.away === away && g.home === home)));
+    const h2h = `<div class="panel"><h3>${esc(t("mu.h2h"))}</h3>${met.length ? `<ul class="mu-recent">${met.map((g) => {
+      const by = team(lg, g.first.team);
+      return `<li><a href="#game=${lg}-${esc(g.id)}"><span class="d">${esc(dayStr(g.date))}</span><span>${esc(g.away)} @ ${esc(g.home)}</span>
+        <span class="by"><img src="${esc(by.logo)}" alt="">${esc(g.first.scorer)}</span><span class="mark">${esc(periodLabel(lg, g.first.period))} ${esc(g.first.clock)}</span></a></li>`;
+    }).join("")}</ul>` : `<p class="empty">${esc(t("mu.noH2h"))}</p>`}</div>`;
+    el.innerHTML = `${quick}<div class="panel"><h3>${esc(t("mu.pickTeams"))}</h3>${pickers}</div>
+      ${lean}<div class="cols mu-cols">${a.html}${h.html}</div>${h2h}`;
+  }
+
+  function setMatchup(lg, away, home) {
+    state.matchup[lg] = { away, home }; store.set("matchup", state.matchup); renderMatchup();
+  }
+
   const statsLeague = () => {
     const lg = state.league === "all" ? state.statsLeague : state.league;
     return state.sports.has(lg) ? lg : leagues()[0];
@@ -563,21 +677,22 @@
 
   // ---------------------------------------------------------------- shell
   function render() {
-    for (const v of ["latest", "teams", "stats"]) $(`#view-${v}`).hidden = v !== state.view;
+    for (const v of VIEWS) $(`#view-${v}`).hidden = v !== state.view;
     document.querySelectorAll(".tabs a").forEach((a) => {
       if (a.dataset.view === state.view) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
     });
-    const active = state.view === "stats" ? statsLeague() : state.league;
+    const perLeague = state.view === "stats" || state.view === "matchup";
+    const active = perLeague ? statsLeague() : state.league;
     const single = state.sports.size === 1;
     document.querySelectorAll(".chips button[data-league]").forEach((b) => {
       const lg = b.dataset.league;
       b.setAttribute("aria-pressed", String(lg === active || (single && lg === "all")));
-      b.hidden = lg === "all" ? (state.view === "stats" || single) : (!state.sports.has(lg) || single);
+      b.hidden = lg === "all" ? (perLeague || single) : (!state.sports.has(lg) || single);
     });
     const mineBtn = $("#mine-only");
     mineBtn.hidden = state.view !== "latest";
     mineBtn.setAttribute("aria-pressed", String(state.mineOnly));
-    ({ latest: renderLatest, teams: renderTeams, stats: renderStats })[state.view]();
+    ({ latest: renderLatest, teams: renderTeams, matchup: renderMatchup, stats: renderStats })[state.view]();
     if (state.updated) $("#updated").textContent = `${freshness()}.`;
     state.firstLoad = false;
   }
@@ -585,14 +700,15 @@
   function route() {
     const v = location.hash.replace("#", "");
     if (v.startsWith("game=")) { focusGame(v.slice(5)); return; }
-    state.view = ["latest", "teams", "stats"].includes(v) ? v : "latest";
+    if (v.startsWith("matchup=")) { openMatchup(v.slice(8)); return; }
+    state.view = VIEWS.includes(v) ? v : "latest";
     render();
   }
 
   function wire() {
     document.querySelector(".chips").addEventListener("click", (e) => {
       const b = e.target.closest("button[data-league]"); if (!b) return;
-      if (state.view === "stats" && b.dataset.league !== "all") { state.statsLeague = b.dataset.league; store.set("statsLeague", state.statsLeague); }
+      if ((state.view === "stats" || state.view === "matchup") && b.dataset.league !== "all") { state.statsLeague = b.dataset.league; store.set("statsLeague", state.statsLeague); }
       state.league = b.dataset.league; store.set("league", state.league); render();
     });
     $("#mine-only").addEventListener("click", () => {
@@ -623,6 +739,20 @@
       const lg = row.dataset.league, abbr = row.dataset.pickteam;
       state.mapTeam[lg] = state.mapTeam[lg] === abbr ? "" : abbr;  // clicking the selected team again shows all
       renderStats();
+    });
+    const mu = $("#view-matchup");
+    mu.addEventListener("click", (e) => {
+      const lg = statsLeague(), m = matchupFor(lg);
+      const q = e.target.closest("[data-mu]");
+      if (q) { const [away, home] = q.dataset.mu.split("|"); setMatchup(lg, away, home); return; }
+      if (e.target.closest("[data-muswap]")) { setMatchup(lg, m.home, m.away); return; }
+      const sp = e.target.closest("[data-musplit]");
+      if (sp) { state.muSplit = sp.dataset.musplit === "1"; store.set("muSplit", state.muSplit); renderMatchup(); }
+    });
+    mu.addEventListener("change", (e) => {
+      const s = e.target.closest("[data-muside]"); if (!s) return;
+      const lg = statsLeague(), m = { ...matchupFor(lg), [s.dataset.muside]: s.value };
+      setMatchup(lg, m.away, m.home);
     });
     $("#view-stats").addEventListener("change", (e) => {
       const s = e.target.closest("[data-mapteam]"); if (!s) return;
@@ -710,6 +840,18 @@
     if (el) { el.scrollIntoView({ block: "center" }); el.classList.add("is-new"); }
   }
 
+  // Deep link: #matchup=nfl-KC-BUF opens that matchup (away first).
+  function openMatchup(ref) {
+    const [lg, away, home] = ref.split("-");
+    if (!ALL_LEAGUES.includes(lg) || !state.teamIdx[teamKey(lg, away)] || !state.teamIdx[teamKey(lg, home)]) { location.hash = "#matchup"; return; }
+    if (!state.sports.has(lg)) { state.sports.add(lg); store.set("sports", [...state.sports]); }
+    state.statsLeague = lg; store.set("statsLeague", lg);
+    if (state.league !== "all") { state.league = lg; store.set("league", lg); }
+    state.matchup[lg] = { away, home }; store.set("matchup", state.matchup);
+    history.replaceState(null, "", "#matchup");
+    state.view = "matchup"; render(); window.scrollTo(0, 0);
+  }
+
   // ---------------------------------------------------------------- install as an app (PWA)
   async function install() {
     if (!state.installPrompt) return;
@@ -739,6 +881,8 @@
     state.mine = new Set(store.get("mine", []));
     state.statsLeague = store.get("statsLeague", "nba");
     state.introDone = store.get("introDone", false);
+    state.matchup = store.get("matchup", {}) || {};
+    state.muSplit = store.get("muSplit", false) === true;
     const sports = store.get("sports", ALL_LEAGUES).filter((lg) => ALL_LEAGUES.includes(lg));
     state.sports = new Set(sports.length ? sports : ALL_LEAGUES);
     state.theme = store.get("theme", "auto");
