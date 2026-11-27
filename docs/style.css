@@ -393,16 +393,29 @@ tr.pick.sel td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .mu-recent img { width: 18px; height: 18px; object-fit: contain; flex: none; }
 .mu-recent .mark { color: var(--text-3); font-size: 14px; white-space: nowrap; }
 .mu-recent li.yes .mark { color: var(--good); font-weight: 700; }
-.mu-lean { display: flex; height: 44px; border-radius: 12px; overflow: hidden; font-weight: 700; font-variant-numeric: tabular-nums; }
-.mu-lean span { display: flex; align-items: center; gap: 6px; padding: 0 12px; min-width: max-content; white-space: nowrap; }
-.mu-lean .a { background: var(--ca); color: #fff; }
-.mu-lean .h { background: var(--ch); color: #fff; justify-content: flex-end; }
-.mu-lean img { width: 24px; height: 24px; object-fit: contain; background: rgba(255,255,255,.85); border-radius: 50%; padding: 2px; }
-.mu-lean + .map-note { margin: 8px 0 0; }
+.mu-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.mu-steps > li { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; }
+.mu-steps .step { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--text); color: var(--bg); font-weight: 700; font-size: 14px; }
+.mu-steps h4 { margin: 2px 0 8px; font-size: 15px; }
+.mu-rate { display: grid; grid-template-columns: minmax(0, 190px) 1fr auto; gap: 10px; align-items: center; margin: 4px 0; font-size: 15px; }
+.mu-rate .bar { display: block; height: 12px; border-radius: 6px; min-width: 2px; }
+.mu-rate .val { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mu-rate small { color: var(--text-3); font-weight: 500; }
+.mu-rate.none { color: var(--text-3); }
+.mu-verdict { margin: 8px 0 0; font-weight: 700; }
+.mu-steps + .map-note { margin: 14px 0 0; }
+.mu-verdict small { display: block; font-weight: 500; color: var(--text-2); margin-top: 2px; }
+.mu-players { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.mu-players li { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 8px; font-size: 15px; }
+.mu-players li.best { background: color-mix(in srgb, var(--accent) 14%, transparent); font-weight: 700; }
+.mu-players .val { margin-left: auto; color: var(--text-3); font-size: 14px; font-weight: 500; white-space: nowrap; }
+.ptag { font-size: 12px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: var(--surface-2); color: var(--text-2); }
 @media (max-width: 560px) {
   .mu-slate { flex-direction: column; align-items: stretch; gap: 6px; }
   .mu-seg button { font-size: 14px; }
   .mu-recent a { grid-template-columns: 48px auto 1fr auto; gap: 8px; }
+  .mu-rate { grid-template-columns: 1fr auto; row-gap: 4px; margin: 6px 0 10px; }
+  .mu-rate .tteam { grid-column: 1 / -1; }
 }
 a.share { text-decoration: none; }
 

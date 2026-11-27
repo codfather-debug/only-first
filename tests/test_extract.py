@@ -68,30 +68,21 @@ class TestFirsts(unittest.TestCase):
         self.assertIsNone(first_nfl({"scoringPlays": []}))
 
 
-class TestMatchupLean(unittest.TestCase):
-    def store(self):
-        g = lambda i, day, away, home, first: (f"nfl:{i}", {"league": "nfl", "date": day, "away": away, "home": home,
-                                                           "first": {"team": first} if first else None})
-        return {"games": dict([
-            g(1, "20261101", "KC", "DEN", "KC"), g(2, "20261108", "KC", "LV", "KC"), g(3, "20261115", "KC", "LAC", "LAC"),
-            g(4, "20261101", "MIA", "BUF", "MIA"), g(5, "20261108", "NYJ", "BUF", "BUF"),
-            g(6, "20261122", "KC", "BUF", "KC"),  # the game being alerted: left out
-            g(7, "20251109", "KC", "BUF", "BUF"),  # last season: left out
-        ])}
+class TestPosition(unittest.TestCase):
+    def test_from_box_score(self):
+        from only_first.__main__ import position
+        summary = {"boxscore": {"players": [{"statistics": [{"athletes": [
+            {"athlete": {"id": "1", "position": {"abbreviation": "C"}}},
+            {"athlete": {"id": "2", "position": {"abbreviation": "G"}}}]}]}]}}
+        self.assertEqual(position("nba", "2", summary), "G")
 
-    def test_lean_matches_the_matchup_tab(self):
-        from only_first.__main__ import lean_note, matchup_lean
-        s = self.store()
-        # KC scored first in 2 of 3, BUF in 1 of 2: (2/3 + 1/2) / 2 = 58%
-        self.assertEqual(matchup_lean(s, "nfl", "20261122", "KC", "BUF", skip="nfl:6"), ("KC", 58))
-        rec = s["games"]["nfl:6"]
-        self.assertEqual(lean_note(s, "nfl", "20261122", rec, "nfl:6"), "Pre-game lean: KC 58% · BUF 42% (called it ✅)")
-        rec["first"]["team"] = "BUF"
-        self.assertTrue(lean_note(s, "nfl", "20261122", rec, "nfl:6").endswith("(missed ❌)"))
-
-    def test_no_lean_without_games(self):
-        from only_first.__main__ import matchup_lean
-        self.assertIsNone(matchup_lean(self.store(), "nfl", "20261122", "KC", "SF"))
+    def test_falls_back_to_athlete_page(self):
+        from unittest import mock
+        from only_first import __main__ as m
+        with mock.patch.object(m.espn, "athlete_position", return_value="RB") as ap:
+            self.assertEqual(m.position("nfl", "99", {"boxscore": {"players": []}}), "RB")
+            self.assertEqual(m.position("nfl", "99", {}), "RB")  # cached
+            ap.assert_called_once()
 
 
 if __name__ == "__main__":

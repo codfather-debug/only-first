@@ -64,6 +64,11 @@ def summary(league: str, game_id: str) -> dict:
     return _get(f"{BASE}/{LEAGUES[league]}/summary?event={game_id}")
 
 
+def athlete_position(league: str, player_id: str) -> str:
+    data = _get(f"https://site.web.api.espn.com/apis/common/v3/sports/{LEAGUES[league]}/athletes/{player_id}")
+    return ((data.get("athlete") or {}).get("position") or {}).get("abbreviation") or ""
+
+
 # The teams endpoint and the scoreboard occasionally disagree; use scoreboard spelling.
 TEAM_ALIASES = {"nhl": {"UTAH": "UTA"}}
 

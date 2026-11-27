@@ -548,6 +548,63 @@
     </div>` };
   }
 
+  // Position groups: NBA guard/forward/center; NHL as given; NFL offense by position, the rest together.
+  function posGroup(lg, p) {
+    p = String(p || "").toUpperCase();
+    if (!p) return "";
+    if (lg === "nba") return p === "C" ? "C" : /^(PG|SG|G)/.test(p) ? "G" : /^(SF|PF|F)/.test(p) ? "F" : p[0];
+    if (lg === "nfl") return p === "FB" ? "RB" : ["RB", "WR", "TE", "QB"].includes(p) ? p : "DST";
+    return p;
+  }
+  const posName = (lg, grp) => t(`pos.${lg}.${grp}`);
+
+  // Who scores first: (1) the team with the better first-score rate in this spot (away team's road
+  // games vs home team's home games), (2) that team's most frequent first scorers, (3) which
+  // positions score first against the other team, used to choose the best fit among those scorers.
+  function pickPanel(lg, games, A, H) {
+    const rate = (tm, side) => {
+      const gs = games.filter((g) => g[side] === tm.abbr);
+      return { n: gs.length, first: gs.filter((g) => g.first.team === tm.abbr).length };
+    };
+    const ra = rate(A, "away"), rh = rate(H, "home");
+    const row = (tm, r, key) => `<div class="mu-rate${r.n ? "" : " none"}"><span class="tteam"><img src="${esc(tm.logo)}" alt="">${esc(t(key, { team: tm.short }))}</span>
+        <span class="bar" style="width:${pct(r.first, r.n)}%;background:${hex(tm.color)}"></span>
+        <span class="val">${r.n ? `${pct(r.first, r.n)}% <small>${r.first}/${r.n}</small>` : "–"}</span></div>`;
+    const step = (n, title, body) => `<li><span class="step">${n}</span><div><h4>${esc(title)}</h4>${body}</div></li>`;
+    const pa = ra.n ? ra.first / ra.n : null, ph = rh.n ? rh.first / rh.n : null;
+    const pick = pa == null || ph == null || pa === ph ? null : pa > ph ? A : H;
+    const steps = [step(1, t("mu.step.team"), row(A, ra, "mu.road") + row(H, rh, "mu.atHome") +
+      `<p class="mu-verdict">${esc(pa == null || ph == null ? t("mu.noPick") : pick ? t("mu.pick", { team: pick.name }) : t("mu.even"))}</p>`)];
+    if (pick) {
+      const opp = pick === A ? H : A;
+      // (3) positions of the scorers when the opponent's opponent scored first
+      const against = games.filter((g) => (g.home === opp.abbr || g.away === opp.abbr) && g.first.team !== opp.abbr);
+      const withPos = against.filter((g) => posGroup(lg, g.first.pos));
+      const share = new Map(count(withPos, (g) => posGroup(lg, g.first.pos)));
+      // (2) the pick's first scorers, best fit first: most firsts, weighted by how often their position scores against the opponent
+      const mine = games.filter((g) => g.first.team === pick.abbr);
+      const players = count(mine, (g) => g.first.scorer_id || g.first.scorer).map(([k, n]) => {
+        const g = mine.find((x) => (x.first.scorer_id || x.first.scorer) === k);
+        const grp = posGroup(lg, g.first.pos);
+        return { name: g.first.scorer, id: g.first.scorer_id, grp, n, fit: n * (withPos.length ? (share.get(grp) || 0) / withPos.length + 0.05 : 1) };
+      });
+      const best = withPos.length >= 3 ? [...players].sort((x, y) => y.fit - x.fit || y.n - x.n)[0] : null;
+      const plist = players.slice(0, 3).map((p) => `<li${best && p === best ? ' class="best"' : ""}>
+          ${p.id ? `<img class="pface" src="${esc(headshot(lg, p.id, 60, 44))}" alt="" loading="lazy">` : ""}<span>${esc(p.name)}</span>
+          ${p.grp ? `<span class="ptag">${esc(p.grp)}</span>` : ""}<span class="val">${esc(t("mu.ofFirsts", { n: p.n, team: pick.abbr, total: mine.length }))}</span></li>`).join("");
+      steps.push(step(2, t("mu.step.player"), plist ? `<ul class="mu-players">${plist}</ul>` : `<p class="empty">${esc(t("mu.none"))}</p>`));
+      const pending = against.length - withPos.length > against.length / 4 ? `<p class="map-note">${esc(t("mu.posPending"))}</p>` : "";
+      const posBody = withPos.length
+        ? bars([...share.entries()].map(([grp, n]) => [posName(lg, grp), n]), withPos.length) +
+          `<p class="map-note">${esc(t("mu.posNote", { n: withPos.length, team: opp.short }))}</p>` + pending +
+          (best ? `<p class="mu-verdict">${esc(t("mu.bestFit", { name: best.name }))}${best.grp ? ` <small>${esc(t("mu.bestFitWhy", { pos: posName(lg, best.grp), pct: pct(share.get(best.grp) || 0, withPos.length), team: opp.short }))}</small>` : ""}</p>` : "")
+        : `<p class="empty">${esc(t("mu.posPending"))}</p>`;
+      steps.push(step(3, t("mu.step.pos", { team: opp.short }), posBody));
+    }
+    return `<div class="panel"><h3>${esc(t("mu.lean"))}</h3><ol class="mu-steps">${steps.join("")}</ol>
+      <p class="map-note">${esc(t("mu.how"))}</p></div>`;
+  }
+
   function renderMatchup() {
     const el = $("#view-matchup");
     const lg = statsLeague();
@@ -574,16 +631,7 @@
       return;
     }
     const a = sideCard(lg, games, away, "away", split), h = sideCard(lg, games, home, "home", split);
-    let lean = "";
-    if (a.played && h.played) {
-      const ra = a.first / a.played, rh = h.first / h.played;
-      const pa = Math.round(50 * (ra + (1 - rh)));
-      lean = `<div class="panel"><h3>${esc(t("mu.lean"))}</h3>
-        <div class="mu-lean" style="--ca:${hex(A.color)};--ch:${hex(H.color)}">
-          <span class="a" style="width:${pa}%"><img src="${esc(A.logo)}" alt="">${esc(A.abbr)} ${pa}%</span>
-          <span class="h" style="width:${100 - pa}%">${100 - pa}% ${esc(H.abbr)}<img src="${esc(H.logo)}" alt=""></span>
-        </div><p class="map-note">${esc(t("mu.leanNote"))}</p></div>`;
-    }
+    const lean = pickPanel(lg, games, A, H);
     const met = games.filter((g) => playsIn(g, away) && playsIn(g, home) && (!split || (g.away === away && g.home === home)));
     const h2h = `<div class="panel"><h3>${esc(t("mu.h2h"))}</h3>${met.length ? `<ul class="mu-recent">${met.map((g) => {
       const by = team(lg, g.first.team);

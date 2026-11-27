@@ -17,7 +17,7 @@ import re
 from dataclasses import dataclass, asdict, field
 from typing import Optional
 
-SCHEMA = 2  # bump when FirstScore gains fields, so stored games get re-read
+SCHEMA = 3  # bump when FirstScore gains fields, so stored games get re-read
 
 
 @dataclass
@@ -34,6 +34,7 @@ class FirstScore:
     assists: list[str]
     scorer_id: str = ""
     spot: Optional[dict] = None
+    pos: str = ""         # scorer's position: NBA G/F/C, NHL C/LW/RW/D, NFL RB/WR/TE/QB...
     v: int = SCHEMA
 
     def to_dict(self) -> dict:
