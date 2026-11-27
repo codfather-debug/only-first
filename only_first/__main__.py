@@ -105,6 +105,34 @@ def season_note(store: dict, league: str, day: str, first: dict) -> str:
     return f"{times} this season scoring the game's first {WHAT[league]}"
 
 
+def matchup_lean(store: dict, league: str, day: str, away: str, home: str, skip: str = "") -> tuple[str, int] | None:
+    """The Matchup tab's lean, from this season's games before this one: the average of how often
+    each team scores first and how often the other lets its opponent. (team favoured, its %) or None."""
+    season = season_of(day)
+    def rate(abbr: str) -> float | None:
+        games = [g for k, g in store["games"].items()
+                 if k != skip and g.get("league") == league and g.get("first") and g.get("date", "") <= day
+                 and season_of(g["date"]) == season and abbr in (g.get("home"), g.get("away"))]
+        return sum(g["first"]["team"] == abbr for g in games) / len(games) if games else None
+    ra, rh = rate(away), rate(home)
+    if ra is None or rh is None:
+        return None
+    pa = round(50 * (ra + (1 - rh)))
+    return (away, pa) if pa >= 50 else (home, 100 - pa)
+
+
+def lean_note(store: dict, league: str, day: str, rec: dict, key: str) -> str | None:
+    lean = matchup_lean(store, league, day, rec["away"], rec["home"], skip=key)
+    if not lean:
+        return None
+    team, p = lean
+    other = rec["home"] if team == rec["away"] else rec["away"]
+    if p == 50:
+        return f"Pre-game lean: {team} 50% · {other} 50% (a coin flip)"
+    called = "called it ✅" if rec["first"]["team"] == team else "missed ❌"
+    return f"Pre-game lean: {team} {p}% · {other} {100 - p}% ({called})"
+
+
 def process_date(store: dict, league: str, day: str, alert: bool) -> int:
     """Refresh one league/date in the store. Returns number of new first scores."""
     new = 0
@@ -135,7 +163,7 @@ def process_date(store: dict, league: str, day: str, alert: bool) -> int:
             note = season_note(store, league, day, rec["first"])
             if alert:
                 notify.send(fs, [g["home"], g["away"]], prefix, site, note,
-                            image=lambda: shareimg.image(fs, rec, note, site))
+                            lean=lean_note(store, league, day, rec, key), image=lambda: shareimg.image(fs, rec, note, site))
             else:
                 notify.console(fs, note)
     return new

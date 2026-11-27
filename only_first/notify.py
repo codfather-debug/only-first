@@ -75,9 +75,10 @@ def multipart(fields: dict[str, str], files: dict[str, tuple[str, bytes, str]]) 
     return out + f"--{boundary}--\r\n".encode(), f"multipart/form-data; boundary={boundary}"
 
 
-def _webhook(url: str, fs: FirstScore, note: str | None = None, image=None) -> None:
-    """image: a function returning the share image's PNG bytes (or None), called only for Discord."""
-    text = f"{EMOJI.get(fs.league, '')} **Only First:** {fs.headline()}\n{_body(fs, note)}"
+def _webhook(url: str, fs: FirstScore, note: str | None = None, image=None, lean: str | None = None) -> None:
+    """image: a function returning the share image's PNG bytes (or None), called only for Discord.
+    lean: the Matchup tab's pre-game lean, webhook only."""
+    text = f"{EMOJI.get(fs.league, '')} **Only First:** {fs.headline()}\n{_body(fs, note)}" + (f"\n{lean}" if lean else "")
     headers = {"User-Agent": "only-first/0.3"}
     png = None
     if image and _is_discord(url):
@@ -95,7 +96,7 @@ def _webhook(url: str, fs: FirstScore, note: str | None = None, image=None) -> N
 
 
 def send(fs: FirstScore, teams: list[str], prefix: str | None, site_url: str | None = None,
-         note: str | None = None, image=None) -> None:
+         note: str | None = None, image=None, lean: str | None = None) -> None:
     """Phone alerts go first; the webhook, which may wait a few seconds for the image, goes last."""
     console(fs, note)
     server = os.environ.get("ONLY_FIRST_NTFY_SERVER", "https://ntfy.sh")
@@ -105,7 +106,7 @@ def send(fs: FirstScore, teams: list[str], prefix: str | None, site_url: str | N
         jobs += [(f"ntfy:{t}", lambda t=t: _ntfy(server, t, fs, site_url, note))
                  for t in topics(prefix, fs.league, teams)]
     if hook:
-        jobs.append(("webhook", lambda: _webhook(hook, fs, note, image)))
+        jobs.append(("webhook", lambda: _webhook(hook, fs, note, image, lean)))
     for name, fn in jobs:
         try:
             fn()
