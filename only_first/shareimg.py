@@ -80,21 +80,57 @@ def options(fs: FirstScore, game: dict, note: str | None, site_url: str | None) 
     }
 
 
+def page(opts: dict) -> str:
+    """render.html with the options inlined and the website's scripts linked by absolute path."""
+    html = (ROOT / "render.html").read_text().replace('src="../docs/', f'src="{DOCS.as_uri()}/')
+    data = json.dumps(opts).replace("</", "<\\/")
+    return html.replace("<body>", f"<body>\n<script>window.OF_OPTS = {data};</script>", 1)
+
+
 def image(fs: FirstScore, game: dict, note: str | None = None, site_url: str | None = None,
           timeout: int = 60) -> bytes | None:
-    """PNG bytes of the share image, or None if Chrome is missing or drawing fails."""
+    """PNG bytes of the share image, or None (with the reason printed) if Chrome is missing or drawing fails."""
     exe = chrome()
     if not exe:
+        print("   [warn] share image: no Chrome found", flush=True)
         return None
-    url = (ROOT / "render.html").as_uri() + "#" + urllib.parse.quote(json.dumps(options(fs, game, note, site_url)))
     with tempfile.TemporaryDirectory() as tmp:
+        html = Path(tmp) / "share.html"
+        html.write_text(page(options(fs, game, note, site_url)))
         out = Path(tmp) / "share.png"
         cmd = [exe, "--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
                "--force-device-scale-factor=1", "--window-size=1080,1350", "--virtual-time-budget=15000",
-               f"--user-data-dir={tmp}/profile", f"--screenshot={out}", url]
+               "--allow-file-access-from-files", f"--user-data-dir={tmp}/profile", f"--screenshot={out}", html.as_uri()]
         try:
-            subprocess.run(cmd, capture_output=True, timeout=timeout)
-        except (OSError, subprocess.TimeoutExpired):
+            run = subprocess.run(cmd, capture_output=True, timeout=timeout)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            print(f"   [warn] share image: Chrome failed to run: {e}", flush=True)
             return None
         data = out.read_bytes() if out.exists() else b""
-    return data if data.startswith(b"\x89PNG") and len(data) > 20000 else None
+    if data.startswith(b"\x89PNG") and len(data) > 20000:
+        return data
+    tail = run.stderr.decode(errors="replace").strip().splitlines()[-3:]
+    print(f"   [warn] share image: no usable screenshot ({len(data)} bytes, exit {run.returncode}): {' | '.join(tail)}", flush=True)
+    return None
+
+
+def main(argv: list[str]) -> int:
+    """python -m only_first.shareimg [out.png]: draw the newest stored first score (a check that
+    Chrome works where the tracker runs). Exits 1 if no image comes out."""
+    from .__main__ import load_store, season_note
+    store = load_store()
+    rec = max((g for g in store["games"].values() if g.get("first")), key=lambda g: g.get("start", ""))
+    fs = FirstScore(**{k: v for k, v in rec["first"].items() if k in FirstScore.__dataclass_fields__})
+    png = image(fs, rec, season_note(store, fs.league, rec["date"], rec["first"]), None)
+    out = Path(argv[0] if argv else "share.png")
+    if not png:
+        print(f"no image for {fs.headline()}")
+        return 1
+    out.write_bytes(png)
+    print(f"{out}: {len(png)} bytes, {fs.headline()}")
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main(sys.argv[1:]))

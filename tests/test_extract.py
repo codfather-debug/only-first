@@ -139,3 +139,25 @@ class TestDiscordImage(unittest.TestCase):
         self.assertTrue(o["photo"].endswith("3934672.png&w=700&h=510&scale=crop&cquality=60"))
         self.assertIn(o["ink"], ("#ffffff", "#12151c"))
 
+
+
+class TestShareImageCommand(unittest.TestCase):
+    def test_chrome_arguments_stay_short(self):
+        # Linux refuses any single argument over 128 KB, and the options (with the logo) are far bigger.
+        from unittest import mock
+        from only_first import shareimg
+        from only_first.extract import FirstScore
+        fs = FirstScore(league="nhl", game_id="1", matchup="DAL @ STL", team="STL", scorer="Philip Broberg",
+                        how="Wrist Shot", period="1st", clock="0:24", description="", assists=[], scorer_id="4378683")
+        seen = {}
+        def fake_run(cmd, **kw):
+            seen["cmd"] = cmd
+            seen["page"] = Path(cmd[-1].replace("file://", "")).read_text()
+            return mock.Mock(returncode=0, stderr=b"")
+        from pathlib import Path
+        with mock.patch.object(shareimg, "chrome", return_value="chrome"), \
+             mock.patch.object(shareimg.subprocess, "run", side_effect=fake_run):
+            shareimg.image(fs, {"date": "20261127", "name": "DAL @ STL"}, "2nd time", None)
+        self.assertLess(max(len(a) for a in seen["cmd"]), 4096)
+        self.assertIn("window.OF_OPTS = {", seen["page"])
+        self.assertIn("Philip Broberg", seen["page"])
