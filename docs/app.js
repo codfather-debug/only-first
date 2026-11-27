@@ -532,7 +532,7 @@
         <span class="d">${esc(dayStr(g.date))}</span>
         <span class="tteam">${home ? "vs" : "@"} <img src="${esc(opp.logo)}" alt="">${esc(opp.abbr)}</span>
         <span class="by"><img src="${esc(by.logo)}" alt="">${esc(g.first.scorer)}</span>
-        <span class="mark" aria-hidden="true">${mine ? "✓" : "✗"}</span></a></li>`;
+        <span class="mark"><span aria-hidden="true">${mine ? "✓" : "✗"}</span><span class="sr-only">${esc(t(mine ? "mu.srYes" : "mu.srNo", { team: tm.short }))}</span></span></a></li>`;
     }).join("");
     return { played: played.length, first: first.length, html: `<div class="panel mu-side" style="${teamVars(tm)}">
       <div class="mu-head"><img src="${esc(tm.logo)}" alt=""><div><small>${esc(t(`side.${side}`))}</small><h2>${esc(tm.name)}</h2></div></div>

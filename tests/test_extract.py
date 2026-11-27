@@ -161,3 +161,46 @@ class TestShareImageCommand(unittest.TestCase):
         self.assertLess(max(len(a) for a in seen["cmd"]), 4096)
         self.assertIn("window.OF_OPTS = {", seen["page"])
         self.assertIn("Philip Broberg", seen["page"])
+
+
+class TestNflScorerText(unittest.TestCase):
+    def test_short_form(self):
+        from only_first.extract import _nfl_scorer
+        self.assertEqual(_nfl_scorer("Deebo Samuel 82 Yd pass from Brock Purdy (Eddy Pineiro Kick)"), "Deebo Samuel")
+
+    def test_long_form_with_lateral(self):
+        from only_first.extract import _nfl_long_form, _nfl_scorer
+        text = "Brock Purdy complete pass to Mike Evans for 2 yards, lateral to Deebo Samuel for 80 yards (Eddy Pineiro Kick)"
+        self.assertEqual(_nfl_scorer(text), "Deebo Samuel")
+        self.assertEqual(_nfl_long_form(text), (82, "Brock Purdy"))
+
+    def test_long_form_pass(self):
+        from only_first.extract import _nfl_scorer
+        self.assertEqual(_nfl_scorer("Jared Goff pass short left to Sam LaPorta for 12 yards, TOUCHDOWN"), "Sam LaPorta")
+
+    def test_falls_back_to_last_named_player(self):
+        from only_first.extract import _nfl_scorer
+        known = {"Jahmyr Gibbs": "1", "Jake Bates": "2"}
+        self.assertEqual(_nfl_scorer("Jahmyr Gibbs up the middle, TOUCHDOWN (Jake Bates Kick)", known), "Jahmyr Gibbs")
+
+
+class TestNameMatch(unittest.TestCase):
+    def test_suffixes_ignored(self):
+        from only_first.extract import _norm
+        self.assertEqual(_norm("Deebo Samuel Sr."), _norm("Deebo Samuel"))
+        self.assertEqual(_norm("James Cook III"), _norm("James Cook"))
+        self.assertNotEqual(_norm("Josh Allen"), _norm("Josh Allen Jr"[:-3] + "x"))
+
+
+class TestNtfyClick(unittest.TestCase):
+    def test_click_opens_the_game(self):
+        import json as _json
+        from unittest import mock
+        from only_first import notify
+        from only_first.extract import FirstScore
+        fs = FirstScore(league="nfl", game_id="401873081", matchup="CHI @ DET", team="DET", scorer="Jahmyr Gibbs",
+                        how="Rushing Touchdown", period="Q1", clock="9:00", description="", assists=[])
+        with mock.patch.object(notify.urllib.request, "urlopen") as op:
+            notify._ntfy("https://ntfy.example", "t", fs, "https://onlyf1rst.com/")
+        sent = _json.loads(op.call_args[0][0].data)
+        self.assertEqual(sent["click"], "https://onlyf1rst.com/#game=nfl-401873081")

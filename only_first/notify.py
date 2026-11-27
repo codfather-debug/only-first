@@ -43,8 +43,8 @@ def console(fs: FirstScore, note: str | None = None) -> None:
 def _ntfy(server: str, topic: str, fs: FirstScore, click: str | None, note: str | None = None) -> None:
     payload = {"topic": topic, "title": f"Only First: {fs.headline()}",
                "message": _body(fs, note), "tags": [NTFY_TAGS[fs.league]]}
-    if click:
-        payload["click"] = click
+    if click:  # tapping the alert opens this game's card on the site
+        payload["click"] = f"{click.split('#')[0]}#game={fs.league}-{fs.game_id}"
     req = urllib.request.Request(server.rstrip("/"), data=json.dumps(payload).encode(),
                                  headers={"Content-Type": "application/json"}, method="POST")
     for attempt in range(3):

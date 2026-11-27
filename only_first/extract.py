@@ -17,7 +17,7 @@ import re
 from dataclasses import dataclass, asdict, field
 from typing import Optional
 
-SCHEMA = 3  # bump when FirstScore gains fields, so stored games get re-read
+SCHEMA = 4  # bump when FirstScore gains fields, so stored games get re-read
 
 
 @dataclass
@@ -84,6 +84,14 @@ def _athletes(summary: dict) -> dict[str, str]:
                 if ath.get("id"):
                     out[str(ath["id"])] = ath.get("displayName", "")
     return out
+
+
+_SUFFIX = re.compile(r"\s+(?:jr|sr|ii|iii|iv|v)\.?$", re.I)
+
+
+def _norm(name: str) -> str:
+    """Name for matching: no Jr./Sr./III suffix, periods or case ("Deebo Samuel Sr." == "Deebo Samuel")."""
+    return _SUFFIX.sub("", (name or "").strip()).replace(".", "").lower()
 
 
 def _game_id(summary: dict) -> str:
@@ -228,9 +236,28 @@ def first_nhl(summary: dict) -> Optional[FirstScore]:
 _PERIODS = {1: "Q1", 2: "Q2", 3: "Q3", 4: "Q4"}
 
 
-def _nfl_scorer(text: str) -> str:
-    m = re.match(r"^(.+?)\s+\d+\s+Yd", text) or re.match(r"^(.+?)\s+(?:Fumble|Blocked|Interception)", text)
-    return m.group(1).strip() if m else text
+def _nfl_scorer(text: str, known: dict | None = None) -> str:
+    """Who scored, from either form ESPN writes:
+    short: "Deebo Samuel 82 Yd pass from Brock Purdy (Eddy Pineiro Kick)"
+    long:  "Brock Purdy complete pass to Mike Evans for 2 yards, lateral to Deebo Samuel for 80 yards ..."
+    Failing both, the last known player named in the play (the kicker's note left out)."""
+    laterals = re.findall(r"lateral to (.+?) for -?\d+ yards?", text)
+    if laterals:
+        return laterals[-1].strip()
+    m = (re.match(r"^(.+?)\s+\d+\s+Yd", text) or re.match(r"^(.+?)\s+(?:Fumble|Blocked|Interception)", text)
+         or re.search(r"pass (?:(?:short|deep) )?(?:(?:left|right|middle) )?to (.+?) for -?\d+ yards?", text))
+    if m:
+        return m.group(1).strip()
+    play = re.sub(r"\([^)]*\)", "", text)
+    named = sorted((play.rfind(n), n) for n in (known or {}) if n and play.rfind(n) >= 0)
+    return named[-1][1] if named else text
+
+
+def _nfl_long_form(text: str) -> tuple[Optional[int], Optional[str]]:
+    """(total yards, passer) from the long form: the sum of each "for N yards", and who threw it."""
+    legs = [int(y) for y in re.findall(r"for (-?\d+) yards?", text)]
+    passer = re.match(r"^(.+?) (?:complete )?pass\b", text)
+    return (sum(legs) if legs else None), (passer.group(1).strip() if passer else None)
 
 
 def _nfl_lane(text: str) -> Optional[str]:
@@ -264,11 +291,15 @@ def first_nfl(summary: dict) -> Optional[FirstScore]:
         how = (p.get("type") or {}).get("text", "Touchdown")
         yards = re.search(r"(\d+)\s+Yd", text)
         n = int(yards.group(1)) if yards else None
+        passer = re.search(r"pass from (.+?)(?:\s*\(|$)", text)
+        passer = passer.group(1).strip() if passer else None
+        if n is None:
+            n, long_passer = _nfl_long_form(text)
+            passer = passer or (long_passer if "pass" in how.lower() else None)
         if n is not None:
             how += f", {n} yd" + ("" if n == 1 else "s")
-        passer = re.search(r"pass from (.+?)(?:\s*\(|$)", text)
         if passer:
-            how += f" from {passer.group(1).strip()}"
+            how += f" from {passer}"
         detail = _nfl_play(summary, str(p.get("id")))
         lane = _nfl_lane(detail.get("text", ""))
         to_go = (detail.get("start") or {}).get("yardsToEndzone")
@@ -277,14 +308,15 @@ def first_nfl(summary: dict) -> Optional[FirstScore]:
             spot = {"yards": int(to_go), "lane": lane}
         elif n is not None:
             spot = {"yards": min(n, 100), "lane": lane}
-        scorer = _nfl_scorer(text)
+        scorer = _nfl_scorer(text, names)
         num = (p.get("period") or {}).get("number")
         return FirstScore(
             league="nfl", game_id=_game_id(summary), matchup=_matchup(summary),
             team=_team_abbr(p, teams), scorer=scorer, how=how,
             period=_PERIODS.get(num, "OT" if num else ""),
             clock=(p.get("clock") or {}).get("displayValue", ""),
-            description=text, assists=[], scorer_id=names.get(scorer, ""), spot=spot,
+            description=text, assists=[], spot=spot,
+            scorer_id=names.get(scorer) or {_norm(k): v for k, v in names.items()}.get(_norm(scorer), ""),
         )
     return None
 
