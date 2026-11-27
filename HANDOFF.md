@@ -62,6 +62,7 @@ cd docs && python -m http.server 8000           # open http://localhost:8000
 3. It saves everything to `firsts.json` on the `data` branch.
 4. The website (GitHub Pages, `docs/` on `main`) reads that file from the `data` branch.
    Keeping data on its own branch avoids rebuilding the site on every update.
+5. **Standby on the home PC** (`python -m only_first.standby`, every 5 minutes from Windows Task Scheduler). It asks GitHub whether the tracker has run in the last 15 minutes. If it has, the PC does nothing. If not, the PC tracks games, sends the alerts and saves to the `data` branch until GitHub runs again, and posts "PC took over" / "GitHub is back" to a private ntfy topic. It's the only writer to `data` besides the workflow. `--check` reports what it sees; `--rehearse` takes over without alerts or saving.
 
 ## GitHub settings already in place
 

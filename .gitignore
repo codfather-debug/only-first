@@ -1,3 +1,6 @@
 __pycache__/
 # Score data lives on the `data` branch; this is just the local copy.
 docs/data/
+standby-data/
+standby-state.json
+standby.log

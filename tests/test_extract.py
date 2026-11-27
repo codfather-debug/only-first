@@ -204,3 +204,30 @@ class TestNtfyClick(unittest.TestCase):
             notify._ntfy("https://ntfy.example", "t", fs, "https://onlyf1rst.com/")
         sent = _json.loads(op.call_args[0][0].data)
         self.assertEqual(sent["click"], "https://onlyf1rst.com/#game=nfl-401873081")
+
+
+class TestStandby(unittest.TestCase):
+    from datetime import datetime as _dt, timezone as _tz
+    NOW = _dt(2026, 11, 27, 20, 0, tzinfo=_tz.utc)
+
+    def run_(self, status, minutes_ago, conclusion="success"):
+        t = (self.NOW - __import__("datetime").timedelta(minutes=minutes_ago)).isoformat().replace("+00:00", "Z")
+        return {"status": status, "conclusion": conclusion, "updated_at": t, "run_started_at": t, "created_at": t}
+
+    def test_alive_while_a_run_is_going(self):
+        from only_first.standby import stalled
+        self.assertFalse(stalled([self.run_("in_progress", 5), self.run_("completed", 30)], self.NOW))
+
+    def test_alive_just_after_a_run(self):
+        from only_first.standby import stalled
+        self.assertFalse(stalled([self.run_("completed", 3)], self.NOW))
+
+    def test_stalled_after_quiet_spell(self):
+        from only_first.standby import stalled
+        self.assertTrue(stalled([self.run_("completed", 40)], self.NOW))
+
+    def test_stuck_or_queued_runs_dont_count(self):
+        from only_first.standby import stalled
+        self.assertTrue(stalled([self.run_("in_progress", 45), self.run_("queued", 1), self.run_("completed", 50)], self.NOW))
+        self.assertTrue(stalled([self.run_("completed", 2, conclusion="cancelled")], self.NOW))
+        self.assertTrue(stalled([], self.NOW))

@@ -21,7 +21,10 @@ ROOT = Path(__file__).resolve().parent
 DOCS = ROOT.parent / "docs"
 KICKER = {"nba": "First points", "nhl": "First goal", "nfl": "First touchdown"}
 CHROMES = ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser",
-           "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"]
+           "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+           r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+           r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+           r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"]  # Edge is Chromium too
 
 
 def chrome() -> str | None:
