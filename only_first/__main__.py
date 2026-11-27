@@ -129,6 +129,83 @@ def season_note(store: dict, league: str, day: str, first: dict) -> str:
     return f"{times} this season scoring the game's first {WHAT[league]}"
 
 
+POS_NAMES = {
+    "nba": {"G": "guards", "F": "forwards", "C": "centers"},
+    "nhl": {"C": "centers", "LW": "left wings", "RW": "right wings", "D": "defensemen", "G": "goalies"},
+    "nfl": {"RB": "running backs", "WR": "wide receivers", "TE": "tight ends", "QB": "quarterbacks",
+            "DST": "defense & special teams"},
+}
+
+
+def pos_group(league: str, pos: str | None) -> str:
+    """Same groups as the Matchup tab: NBA G/F/C; NHL as given; NFL RB/WR/TE/QB, the rest DST."""
+    p = (pos or "").upper()
+    if not p:
+        return ""
+    if league == "nba":
+        return "C" if p == "C" else "G" if p in ("PG", "SG", "G") else "F" if p in ("SF", "PF", "F") else p[0]
+    if league == "nfl":
+        return "RB" if p == "FB" else p if p in ("RB", "WR", "TE", "QB") else "DST"
+    return p
+
+
+def matchup_pick(store: dict, league: str, day: str, away: str, home: str, skip: str = "") -> dict | None:
+    """The Matchup tab's pick from this season's games before this one: the team with the better
+    first-score rate in this spot (away team on the road vs home team at home), then the best fit
+    among its first scorers (most firsts, weighted by how often their position scores first against
+    the other team). None when either team lacks games in that spot or the rates are equal."""
+    season = season_of(day)
+    games = [g for k, g in store["games"].items()
+             if k != skip and g.get("league") == league and g.get("first") and g.get("date", "") <= day
+             and season_of(g["date"]) == season]
+    def rate(abbr, side):
+        gs = [g for g in games if g[side] == abbr]
+        return sum(g["first"]["team"] == abbr for g in gs), len(gs)
+    ra, rh = rate(away, "away"), rate(home, "home")
+    if not ra[1] or not rh[1] or ra[0] / ra[1] == rh[0] / rh[1]:
+        return None
+    team = away if ra[0] / ra[1] > rh[0] / rh[1] else home
+    opp = home if team == away else away
+    against = [g for g in games if opp in (g["home"], g["away"]) and g["first"]["team"] != opp]
+    with_pos = [g for g in against if pos_group(league, g["first"].get("pos"))]
+    share = {}
+    for g in with_pos:
+        grp = pos_group(league, g["first"]["pos"])
+        share[grp] = share.get(grp, 0) + 1
+    players = {}
+    for g in sorted(games, key=lambda g: g.get("start", ""), reverse=True):
+        if g["first"]["team"] != team:
+            continue
+        k = g["first"].get("scorer_id") or g["first"]["scorer"]
+        p = players.setdefault(k, {"name": g["first"]["scorer"], "id": g["first"].get("scorer_id", ""),
+                                   "grp": pos_group(league, g["first"].get("pos")), "n": 0})
+        p["n"] += 1
+    best = None
+    if len(with_pos) >= 3 and players:
+        fit = lambda p: p["n"] * (share.get(p["grp"], 0) / len(with_pos) + 0.05)
+        best = max(players.values(), key=lambda p: (fit(p), p["n"]))
+        best = {**best, "pct": round(100 * share.get(best["grp"], 0) / len(with_pos))}
+    return {"team": team, "opp": opp, "away": ra, "home": rh, "best": best}
+
+
+def pick_note(store: dict, league: str, day: str, rec: dict, key: str) -> str | None:
+    pk = matchup_pick(store, league, day, rec["away"], rec["home"], skip=key)
+    if not pk:
+        return None
+    f = rec["first"]
+    pc = lambda r: f"{round(100 * r[0] / r[1])}% ({r[0]}/{r[1]})"
+    mark = lambda ok: "✅" if ok else "❌"
+    lines = [f"🎯 Pre-game pick: **{pk['team']}** {mark(f['team'] == pk['team'])} "
+             f"({rec['away']} on the road {pc(pk['away'])} vs {rec['home']} at home {pc(pk['home'])})"]
+    b = pk["best"]
+    if b:
+        hit = (b["id"] and b["id"] == f.get("scorer_id")) or b["name"] == f.get("scorer")
+        pos = f" ({b['grp']})" if b["grp"] else ""
+        why = f": {POS_NAMES[league].get(b['grp'], b['grp'])} scored {b['pct']}% of firsts against {pk['opp']}" if b["grp"] else ""
+        lines.append(f"Best fit: {b['name']}{pos} {mark(hit)}{why}")
+    return "\n".join(lines)
+
+
 def process_date(store: dict, league: str, day: str, alert: bool) -> int:
     """Refresh one league/date in the store. Returns number of new first scores."""
     new = 0
@@ -159,7 +236,7 @@ def process_date(store: dict, league: str, day: str, alert: bool) -> int:
             note = season_note(store, league, day, rec["first"])
             if alert:
                 notify.send(fs, [g["home"], g["away"]], prefix, site, note,
-                            image=lambda: shareimg.image(fs, rec, note, site))
+                            pick=pick_note(store, league, day, rec, key), image=lambda: shareimg.image(fs, rec, note, site))
             else:
                 notify.console(fs, note)
     return new

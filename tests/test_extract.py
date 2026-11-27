@@ -138,3 +138,35 @@ class TestDiscordImage(unittest.TestCase):
         self.assertEqual(o["dateText"], "Thu, November 26")
         self.assertTrue(o["photo"].endswith("3934672.png&w=700&h=510&scale=crop&cquality=60"))
         self.assertIn(o["ink"], ("#ffffff", "#12151c"))
+
+
+class TestMatchupPick(unittest.TestCase):
+    def test_pick_and_best_fit(self):
+        from only_first.__main__ import matchup_pick, pick_note
+        n = iter(range(100))
+        def g(day, away, home, team, scorer, pos):
+            return f"nfl:{next(n)}", {"league": "nfl", "date": day, "start": day, "away": away, "home": home,
+                                     "first": {"team": team, "scorer": scorer, "scorer_id": scorer, "pos": pos}}
+        games = dict([
+            g("20261101", "CHI", "GB", "GB", "x", "WR"), g("20261108", "CHI", "MIN", "CHI", "y", "RB"),
+            g("20261102", "NYG", "CHI", "NYG", "z", "RB"), g("20261109", "TB", "CHI", "TB", "w", "RB"),
+            g("20261116", "CHI", "SEA", "SEA", "v", "RB"),
+            g("20261101", "GB", "DET", "DET", "Gibbs", "RB"), g("20261108", "MIN", "DET", "DET", "ARSB", "WR"),
+            g("20261115", "SEA", "DET", "DET", "ARSB", "WR"), g("20261116", "LAR", "DET", "LAR", "q", "QB"),
+        ])
+        k, rec = g("20261126", "CHI", "DET", "DET", "Gibbs", "RB")
+        games[k] = rec
+        store = {"games": games}
+        pk = matchup_pick(store, "nfl", "20261126", "CHI", "DET", skip=k)
+        self.assertEqual((pk["team"], pk["away"], pk["home"]), ("DET", (1, 3), (3, 4)))
+        # Against CHI: RB 3 of 4 firsts. ARSB has 2 firsts as a WR (2 x .30), Gibbs 1 as an RB (1 x .80).
+        self.assertEqual(pk["best"]["name"], "Gibbs")
+        note = pick_note(store, "nfl", "20261126", rec, k)
+        self.assertIn("**DET** ✅", note)
+        self.assertIn("Best fit: Gibbs (RB) ✅: running backs scored 75% of firsts against CHI", note)
+
+    def test_no_pick_on_equal_rates(self):
+        from only_first.__main__ import matchup_pick
+        store = {"games": {"a": {"league": "nba", "date": "20261101", "away": "A", "home": "X", "first": {"team": "A"}},
+                           "b": {"league": "nba", "date": "20261101", "away": "Y", "home": "B", "first": {"team": "B"}}}}
+        self.assertIsNone(matchup_pick(store, "nba", "20261126", "A", "B"))
