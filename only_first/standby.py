@@ -166,6 +166,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if not is_stalled:
+        log(f"GitHub tracker alive (last seen {ago}); standing by")
         if state.get("active"):
             tell_owner("Only First: GitHub tracker is back", "The PC has stepped back to standby.")
             STATE.write_text(json.dumps({"active": False}))
