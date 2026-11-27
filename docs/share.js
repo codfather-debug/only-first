@@ -141,10 +141,6 @@
       ctx.drawImage(map, mx, panelY + 60, mw, mh); ctx.restore();
     }
 
-    // Footer
-    ctx.fillStyle = "#7d8492"; ctx.font = `500 30px ${B}`;
-    ctx.fillText(o.url.replace(/^https?:\/\//, "").replace(/\/$/, ""), 64, H - 56);
-
     return c;
   }
 
