@@ -1,0 +1,35 @@
+name: Test Discord channels
+
+# Run by hand: posts the newest first score of each sport, labeled as a test, to that sport's
+# Discord webhook (ONLY_FIRST_WEBHOOK_URL_NBA / _NHL / _NFL, else the shared one). No phone alerts.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out score data
+        uses: actions/checkout@v4
+        with:
+          ref: data
+          path: data-branch
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Post a test to each sport's channel
+        env:
+          ONLY_FIRST_DATA_DIR: data-branch
+          ONLY_FIRST_WEBHOOK_URL: ${{ secrets.ONLY_FIRST_WEBHOOK_URL }}
+          ONLY_FIRST_WEBHOOK_URL_NBA: ${{ secrets.ONLY_FIRST_WEBHOOK_URL_NBA }}
+          ONLY_FIRST_WEBHOOK_URL_NHL: ${{ secrets.ONLY_FIRST_WEBHOOK_URL_NHL }}
+          ONLY_FIRST_WEBHOOK_URL_NFL: ${{ secrets.ONLY_FIRST_WEBHOOK_URL_NFL }}
+        run: python -m only_first.channeltest
