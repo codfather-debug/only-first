@@ -106,15 +106,18 @@
     const name = o.first.scorer.toUpperCase();
     const size = fitText(ctx, name, W - 128, 150, 700, D);
 
-    // Headshot behind the name, poster style
+    // Headshot just below the name, so the name never covers the head; the shoulders run
+    // off the bottom (clipped at the stripe) instead of the photo shrinking
+    const nameBase = 250 + size * 0.98;
     if (photo) {
-      const ph = 560, pw = ph * (photo.width / photo.height);
-      ctx.save(); ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = 40;
-      ctx.drawImage(photo, W - pw - 20, 826 - ph, pw, ph); ctx.restore();
+      const ph = 560, pw = ph * (photo.width / photo.height), top = Math.max(266, nameBase + 14);
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, 826); ctx.clip();
+      ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = 40;
+      ctx.drawImage(photo, W - pw - 20, top, pw, ph); ctx.restore();
     }
     ctx.save();
     ctx.shadowColor = o.ink === "#ffffff" ? "rgba(0,0,0,.55)" : "rgba(255,255,255,.5)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 4;
-    ctx.fillStyle = o.ink; ctx.font = `700 ${size}px ${D}`; ctx.fillText(name, 64, 250 + size * 0.98);
+    ctx.fillStyle = o.ink; ctx.font = `700 ${size}px ${D}`; ctx.fillText(name, 64, nameBase);
     ctx.restore();
 
     // Jersey-trim stripe + white panel

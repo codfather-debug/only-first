@@ -41,6 +41,9 @@ jobs:
         env:
           ONLY_FIRST_DATA_DIR: data-branch
           ONLY_FIRST_WEBHOOK_URL: ${{ secrets.ONLY_FIRST_WEBHOOK_URL }}
+          ONLY_FIRST_WEBHOOK_URL_NBA: ${{ secrets.ONLY_FIRST_WEBHOOK_URL_NBA }}
+          ONLY_FIRST_WEBHOOK_URL_NHL: ${{ secrets.ONLY_FIRST_WEBHOOK_URL_NHL }}
+          ONLY_FIRST_WEBHOOK_URL_NFL: ${{ secrets.ONLY_FIRST_WEBHOOK_URL_NFL }}
         run: python -m only_first update --for-minutes 9 --stay
 
       - name: Save score data

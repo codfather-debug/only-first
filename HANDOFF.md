@@ -68,7 +68,7 @@ cd docs && python -m http.server 8000           # open http://localhost:8000
 
 - **Pages:** deploy from branch `main`, folder `/docs`. Custom domain `onlyf1rst.com` (DNS at Cloudflare: GitHub's four A and four AAAA records plus `www` CNAME, all "DNS only"). Live at https://onlyf1rst.com/; the old github.io address redirects there.
 - **Actions:** the "Track first scores" workflow is enabled. It needs no secrets.
-- **Optional secret:** `ONLY_FIRST_WEBHOOK_URL`, only to also post alerts to a Discord or Slack channel.
+- **Optional secrets:** `ONLY_FIRST_WEBHOOK_URL`, to also post alerts to a Discord or Slack channel; `ONLY_FIRST_WEBHOOK_URL_NBA`, `_NHL`, `_NFL` to give a sport its own channel (a sport without one uses the shared webhook).
 - **Keep the repo public.** Public repos get unlimited free Actions minutes; a private repo would run out in about a week.
 
 ## Status at handoff (Nov 26, 2026)

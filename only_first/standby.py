@@ -13,6 +13,7 @@ tracker workflow last ran:
 
 Setup lives in environment variables:
   ONLY_FIRST_WEBHOOK_URL    the Discord webhook (same as the GitHub secret)
+  ONLY_FIRST_WEBHOOK_URL_NBA / _NHL / _NFL  each sport's Discord channel (same as the GitHub secrets)
   ONLY_FIRST_STANDBY_TOPIC  a private ntfy topic for "PC took over" / "GitHub is back" notes
 
 Files it keeps next to the repo (all gitignored): standby-data/ (a clone of the data
@@ -115,7 +116,8 @@ def track(rehearse: bool) -> None:
     env = {**os.environ, "ONLY_FIRST_DATA_DIR": str(DATA), "PYTHONUTF8": "1"}
     if rehearse:
         env["ONLY_FIRST_NTFY_PREFIX"] = ""      # no phone alerts
-        env.pop("ONLY_FIRST_WEBHOOK_URL", None)  # no Discord
+        for k in [k for k in env if k.startswith("ONLY_FIRST_WEBHOOK_URL")]:
+            env.pop(k)                           # no Discord
     run = subprocess.run([sys.executable, "-m", "only_first", "update", "--for-minutes", str(MINUTES), "--stay"],
                          cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
     for line in (run.stdout + run.stderr).strip().splitlines():

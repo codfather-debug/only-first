@@ -1,4 +1,5 @@
 import json
+import os
 import unittest
 from pathlib import Path
 
@@ -190,6 +191,20 @@ class TestNameMatch(unittest.TestCase):
         self.assertEqual(_norm("Deebo Samuel Sr."), _norm("Deebo Samuel"))
         self.assertEqual(_norm("James Cook III"), _norm("James Cook"))
         self.assertNotEqual(_norm("Josh Allen"), _norm("Josh Allen Jr"[:-3] + "x"))
+
+
+class TestWebhookFor(unittest.TestCase):
+    def test_sport_channel_then_shared(self):
+        from unittest import mock
+        from only_first import notify
+        env = {"ONLY_FIRST_WEBHOOK_URL": "shared", "ONLY_FIRST_WEBHOOK_URL_NBA": "nba",
+               "ONLY_FIRST_WEBHOOK_URL_NHL": ""}
+        with mock.patch.dict(os.environ, env, clear=True):
+            self.assertEqual(notify.webhook_for("nba"), "nba")
+            self.assertEqual(notify.webhook_for("nhl"), "shared")  # empty secret = unset
+            self.assertEqual(notify.webhook_for("nfl"), "shared")
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertIsNone(notify.webhook_for("nfl"))
 
 
 class TestNtfyClick(unittest.TestCase):

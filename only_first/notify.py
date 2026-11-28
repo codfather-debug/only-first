@@ -11,6 +11,8 @@ the same file to build its subscribe links. Env vars:
   ONLY_FIRST_NTFY_PREFIX  override the prefix ("" turns push off)
   ONLY_FIRST_NTFY_SERVER  default https://ntfy.sh
   ONLY_FIRST_WEBHOOK_URL  optional Discord/Slack incoming webhook (all games)
+  ONLY_FIRST_WEBHOOK_URL_NBA / _NHL / _NFL  one sport's own webhook (e.g. its own Discord
+                          channel); a sport without one uses ONLY_FIRST_WEBHOOK_URL
 """
 from __future__ import annotations
 
@@ -94,12 +96,19 @@ def _webhook(url: str, fs: FirstScore, note: str | None = None, image=None) -> N
     urllib.request.urlopen(req, timeout=30).close()
 
 
+def webhook_for(league: str) -> str | None:
+    """The sport's own webhook if set, else the shared one. Empty counts as unset
+    (GitHub passes a missing secret as "")."""
+    return (os.environ.get(f"ONLY_FIRST_WEBHOOK_URL_{league.upper()}")
+            or os.environ.get("ONLY_FIRST_WEBHOOK_URL") or None)
+
+
 def send(fs: FirstScore, teams: list[str], prefix: str | None, site_url: str | None = None,
          note: str | None = None, image=None) -> None:
     """Phone alerts go first; the webhook, which may wait a few seconds for the image, goes last."""
     console(fs, note)
     server = os.environ.get("ONLY_FIRST_NTFY_SERVER", "https://ntfy.sh")
-    hook = os.environ.get("ONLY_FIRST_WEBHOOK_URL")
+    hook = webhook_for(fs.league)
     jobs = []
     if prefix:
         jobs += [(f"ntfy:{t}", lambda t=t: _ntfy(server, t, fs, site_url, note))
